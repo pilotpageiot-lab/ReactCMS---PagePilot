@@ -19,7 +19,7 @@ export function signAccessToken(payload: Omit<AccessTokenPayload, 'type'>): stri
   return jwt.sign(
     { ...payload, type: 'access' },
     config.JWT_ACCESS_SECRET,
-    { expiresIn: config.JWT_ACCESS_EXPIRY },
+    { expiresIn: config.JWT_ACCESS_EXPIRY as unknown as jwt.SignOptions['expiresIn'] },
   );
 }
 
@@ -28,7 +28,7 @@ export function signRefreshToken(userId: string): { token: string; jti: string }
   const token = jwt.sign(
     { sub: userId, jti, type: 'refresh' },
     config.JWT_REFRESH_SECRET,
-    { expiresIn: config.JWT_REFRESH_EXPIRY },
+    { expiresIn: config.JWT_REFRESH_EXPIRY as unknown as jwt.SignOptions['expiresIn'] },
   );
   return { token, jti };
 }
