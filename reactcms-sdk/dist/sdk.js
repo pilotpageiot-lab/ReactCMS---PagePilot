@@ -1,0 +1,635 @@
+/*!
+ * ReactCMS SDK v1.0.0
+ * Lightweight content delivery SDK for plain HTML, React, and JS websites.
+ * https://reactcms.io  |  MIT License
+ *
+ * Auto-init via script attributes:
+ *   <script src="sdk.js" data-key="cms_pk_..." data-website="uuid"></script>
+ *
+ * Manual init:
+ *   <script src="sdk.js"></script>
+ *   <script>
+ *     const cms = new ReactCMSClass({ apiKey:'...', websiteId:'...' });
+ *     cms.load().then(() => cms.observe());
+ *   </script>
+ *
+ * ES module / CommonJS:
+ *   const { ReactCMSClass } = require('reactcms-sdk');
+ *   // or: import { ReactCMSClass } from 'reactcms-sdk';
+ */
+(function (global, factory) {
+  if (typeof module === 'object' && typeof module.exports === 'object') {
+    module.exports = { ReactCMSClass: factory() };
+  } else if (typeof define === 'function' && define.amd) {
+    define(function () { return { ReactCMSClass: factory() }; });
+  } else {
+    var g = typeof globalThis !== 'undefined' ? globalThis : global || self;
+    g.ReactCMSClass = factory();
+  }
+})(this, function () {
+  'use strict';
+
+  /* ─── Constants ─────────────────────────────────────────────────────────── */
+
+  var V            = '1.0.0';
+  var API_URL      = 'https://api.reactcms.io';
+  var CACHE_TTL    = 60000;
+  var BATCH_MAX    = 50;
+  var MAX_RETRY    = 3;
+  var RETRY_BASE   = 100;
+  var STORE_PFX    = 'rcms_';
+  var A_KEY        = 'data-cms';
+  var A_TYPE       = 'data-cms-type';
+  var A_ATTR       = 'data-cms-attr';
+  var A_FALLBACK   = 'data-cms-fallback';
+  var TAG          = '[ReactCMS]';
+
+  /* ─── Tiny helpers ──────────────────────────────────────────────────────── */
+
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  function delay(attempt, header) {
+    if (header) { var s = parseInt(header, 10); if (!isNaN(s)) return s * 1000; }
+    return RETRY_BASE * Math.pow(2, attempt);
+  }
+
+  function retryable(status) { return status === 429 || status >= 500; }
+
+  function log(level) {
+    var args = [TAG].concat(Array.prototype.slice.call(arguments, 1));
+    if (console[level]) console[level].apply(console, args);
+  }
+
+  /* ─── ContentCache ──────────────────────────────────────────────────────── */
+
+  function Cache(wid, ttl) {
+    this.m = Object.create(null); // in-memory
+    this.w = wid;
+    this.t = ttl;
+  }
+
+  Cache.prototype._k = function (k) { return STORE_PFX + this.w + ':' + k; };
+
+  Cache.prototype.get = function (k) {
+    var now = Date.now(), e;
+    if ((e = this.m[k]) && e.x > now) return e.v;
+    if (e) delete this.m[k];
+    try {
+      var raw = localStorage.getItem(this._k(k));
+      if (raw) {
+        e = JSON.parse(raw);
+        if (e.x > now) { this.m[k] = e; return e.v; }
+        localStorage.removeItem(this._k(k));
+      }
+    } catch (_) {}
+    return null;
+  };
+
+  Cache.prototype.set = function (item) {
+    var e = { v: item, x: Date.now() + this.t };
+    this.m[item.key] = e;
+    try { localStorage.setItem(this._k(item.key), JSON.stringify(e)); } catch (_) {}
+  };
+
+  Cache.prototype.misses = function (keys) {
+    var self = this, out = [];
+    keys.forEach(function (k) { if (!self.get(k)) out.push(k); });
+    return out;
+  };
+
+  Cache.prototype.drop = function (k) {
+    delete this.m[k];
+    try { localStorage.removeItem(this._k(k)); } catch (_) {}
+  };
+
+  Cache.prototype.dropAll = function () {
+    this.m = Object.create(null);
+    try {
+      var pfx = STORE_PFX + this.w + ':', out = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var key = localStorage.key(i);
+        if (key && key.slice(0, pfx.length) === pfx) out.push(key);
+      }
+      out.forEach(function (k) { localStorage.removeItem(k); });
+    } catch (_) {}
+  };
+
+  /* ─── ContentFetcher ─────────────────────────────────────────────────────── */
+
+  function Fetcher(cfg) {
+    this.k = cfg.apiKey;
+    this.w = cfg.websiteId;
+    this.u = cfg.apiUrl || API_URL;
+    this.p = cfg.preview || false;
+    this.tags = Object.create(null); // etags by key
+  }
+
+  Fetcher.prototype.hdrs = function () {
+    return { 'Content-Type': 'application/json', 'X-CMS-Key': this.k };
+  };
+
+  Fetcher.prototype.url = function (path, qs) {
+    var u = new URL(path, this.u);
+    u.searchParams.set('website_id', this.w);
+    if (this.p) u.searchParams.set('preview', 'true');
+    if (qs) Object.keys(qs).forEach(function (k) { u.searchParams.set(k, qs[k]); });
+    return u.toString();
+  };
+
+  Fetcher.prototype.one = function (key) {
+    var self = this;
+    var url  = self.url('/public/content', { key: key });
+
+    function go(n) {
+      var hdrs = Object.assign({}, self.hdrs());
+      if (self.tags[key]) hdrs['If-None-Match'] = self.tags[key];
+
+      return fetch(url, { headers: hdrs, credentials: 'omit' })
+        .then(function (res) {
+          if (res.status === 304) return null;
+          if (res.ok) {
+            var etag = res.headers.get('ETag');
+            if (etag) self.tags[key] = etag;
+            return res.json();
+          }
+          if (retryable(res.status) && n < MAX_RETRY)
+            return sleep(delay(n, res.headers.get('Retry-After'))).then(function () { return go(n + 1); });
+          if (res.status === 401) throw new Error('Invalid API key');
+          if (res.status === 404) return null;
+          throw new Error('HTTP ' + res.status);
+        })
+        .catch(function (err) {
+          if (n < MAX_RETRY && !/HTTP/.test(err.message))
+            return sleep(delay(n, null)).then(function () { return go(n + 1); });
+          throw err;
+        });
+    }
+    return go(0);
+  };
+
+  Fetcher.prototype.batch = function (keys) {
+    if (!keys || !keys.length) return Promise.resolve(new Map());
+    var self   = this;
+    var result = new Map();
+    var chunks = [];
+    for (var i = 0; i < keys.length; i += BATCH_MAX)
+      chunks.push(keys.slice(i, i + BATCH_MAX));
+
+    return Promise.all(chunks.map(function (chunk) {
+      var url = self.url('/public/content/batch');
+      function go(n) {
+        return fetch(url, {
+          method: 'POST',
+          headers: self.hdrs(),
+          credentials: 'omit',
+          body: JSON.stringify({ website_id: self.w, keys: chunk, preview: self.p }),
+        })
+        .then(function (res) {
+          if (res.ok) return res.json().then(function (d) {
+            Object.keys(d.data || {}).forEach(function (k) { result.set(k, d.data[k]); });
+          });
+          if (retryable(res.status) && n < MAX_RETRY)
+            return sleep(delay(n, res.headers.get('Retry-After'))).then(function () { return go(n + 1); });
+          if (res.status === 401) throw new Error('Invalid API key');
+          throw new Error('HTTP ' + res.status);
+        })
+        .catch(function (err) {
+          if (n < MAX_RETRY && !/HTTP/.test(err.message))
+            return sleep(delay(n, null)).then(function () { return go(n + 1); });
+          throw err;
+        });
+      }
+      return go(0);
+    })).then(function () { return result; });
+  };
+
+  /* ─── DOM helpers ────────────────────────────────────────────────────────── */
+
+  function inferMode(el, attrName) {
+    if (attrName) return 'attr';
+    var t = el.tagName.toLowerCase();
+    if (t === 'img' || t === 'video' || t === 'audio' || t === 'iframe') return 'src';
+    if (t === 'a')                                                         return 'href';
+    if (t === 'input' || t === 'textarea')                                 return 'value';
+    return 'auto';
+  }
+
+  function autoMode(ct) {
+    if (ct === 'richtext') return 'html';
+    if (ct === 'image')    return 'src';
+    return 'text';
+  }
+
+  function resolveEl(el) {
+    var key = (el.getAttribute(A_KEY) || '').trim();
+    if (!key) return null;
+    var attr = (el.getAttribute(A_ATTR) || '').trim();
+    return {
+      el:  el,
+      key: key,
+      mode: el.getAttribute(A_TYPE) || inferMode(el, attr),
+      attr: attr || null,
+      fb:   el.getAttribute(A_FALLBACK) || el.textContent || '',
+    };
+  }
+
+  function scan(root) {
+    var out = [];
+    (root || document).querySelectorAll('[' + A_KEY + ']').forEach(function (el) {
+      var r = resolveEl(el);
+      if (r) out.push(r);
+    });
+    return out;
+  }
+
+  function apply(r, item) {
+    var el    = r.el;
+    var value = (item.value !== null && item.value !== undefined) ? item.value : r.fb;
+    var mode  = r.mode === 'auto' ? autoMode(item.content_type) : r.mode;
+    try {
+      if      (mode === 'text')  { el.textContent = value; }
+      else if (mode === 'html')  { el.innerHTML   = value; }
+      else if (mode === 'src')   {
+        el.setAttribute('src', value);
+        if (el.tagName.toLowerCase() === 'img' && item.metadata && item.metadata.alt)
+          el.setAttribute('alt', item.metadata.alt);
+      }
+      else if (mode === 'href')  { el.setAttribute('href',  value); }
+      else if (mode === 'value') { el.value = value; }
+      else if (mode === 'attr')  { el.setAttribute(r.attr || 'content', value); }
+      else                       { el.textContent = value; }
+      el.setAttribute('data-cms-loaded', '');
+      el.removeAttribute('data-cms-loading');
+    } catch (e) { log('warn', 'apply error on', el, e); }
+  }
+
+  function markLoad(list) {
+    list.forEach(function (r) { r.el.setAttribute('data-cms-loading', ''); });
+  }
+
+  function fallback(r) {
+    if (r.fb) r.el.textContent = r.fb;
+    r.el.setAttribute('data-cms-error', '');
+    r.el.removeAttribute('data-cms-loading');
+  }
+
+  function watch(root, cb) {
+    if (typeof MutationObserver === 'undefined') return function () {};
+    var obs = new MutationObserver(function (muts) {
+      var found = [];
+      muts.forEach(function (m) {
+        m.addedNodes.forEach(function (n) {
+          if (n.nodeType !== 1) return;
+          var r = resolveEl(n);
+          if (r) found.push(r);
+          found = found.concat(scan(n));
+        });
+      });
+      if (found.length) cb(found);
+    });
+    obs.observe(root || document, { childList: true, subtree: true });
+    return function () { obs.disconnect(); };
+  }
+
+  function uniq(list) {
+    var seen = Object.create(null), out = [];
+    list.forEach(function (r) { if (!seen[r.key]) { seen[r.key] = 1; out.push(r.key); } });
+    return out;
+  }
+
+  function scriptCfg() {
+    var scripts = document.querySelectorAll('script[data-key], script[src*="reactcms"]');
+    for (var i = 0; i < scripts.length; i++) {
+      var s = scripts[i], k = s.getAttribute('data-key');
+      if (!k) continue;
+      return {
+        apiKey:       k,
+        websiteId:    s.getAttribute('data-website'),
+        apiUrl:       s.getAttribute('data-api-url'),
+        preview:      s.getAttribute('data-preview') === 'true',
+        autoDiscover: s.getAttribute('data-auto-discover') === 'true',
+        cacheTtl:     s.getAttribute('data-cache-ttl') ? +s.getAttribute('data-cache-ttl') : null,
+      };
+    }
+    return {};
+  }
+
+  /* ─── Auto-discover ──────────────────────────────────────────────────────── */
+
+  var DISCOVER_TAGS = {
+    h1:1,h2:1,h3:1,h4:1,h5:1,h6:1,p:1,span:1,a:1,button:1,label:1,
+    li:1,td:1,th:1,blockquote:1,figcaption:1,caption:1,legend:1,
+    dt:1,dd:1,summary:1,small:1,strong:1,em:1,b:1,i:1,u:1
+  };
+  var SKIP_ANCESTORS = { script:1, style:1, noscript:1, svg:1, head:1, template:1 };
+  var INLINE_TAGS = { strong:1,em:1,b:1,i:1,u:1,a:1,span:1,br:1,small:1,mark:1,sub:1,sup:1,code:1 };
+  var MIN_TEXT = 2;
+  var MAX_KEY_LEN = 60;
+
+  function insideSkipped(el) {
+    var p = el.parentElement;
+    while (p) {
+      if (SKIP_ANCESTORS[p.tagName.toLowerCase()]) return true;
+      p = p.parentElement;
+    }
+    return false;
+  }
+
+  function slugify(text, maxLen) {
+    return text.toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, maxLen);
+  }
+
+  function hasInlineMarkup(el) {
+    var ch = el.children;
+    for (var j = 0; j < ch.length; j++) {
+      if (INLINE_TAGS[ch[j].tagName.toLowerCase()]) return true;
+    }
+    return false;
+  }
+
+  function hasChildTextTag(el) {
+    var tags = Object.keys(DISCOVER_TAGS).join(',');
+    var children = el.querySelectorAll(tags);
+    for (var j = 0; j < children.length; j++) {
+      var c = children[j];
+      if (c === el || c.hasAttribute(A_KEY)) continue;
+      if ((c.textContent || '').trim().length >= MIN_TEXT) return true;
+    }
+    return false;
+  }
+
+  function discoverElements(root) {
+    var all = (root || document).querySelectorAll('*');
+    var found = [];
+    var usedKeys = Object.create(null);
+
+    for (var i = 0; i < all.length; i++) {
+      var el = all[i];
+      var tag = el.tagName.toLowerCase();
+
+      if (el.hasAttribute(A_KEY)) continue;
+      if (!DISCOVER_TAGS[tag]) continue;
+      if (insideSkipped(el)) continue;
+
+      var fullText = (el.textContent || '').trim();
+      if (fullText.length < MIN_TEXT) continue;
+      if (hasChildTextTag(el)) continue;
+
+      var hasMk = hasInlineMarkup(el);
+      var value = hasMk ? el.innerHTML.trim() : fullText;
+      if (value.length < MIN_TEXT) continue;
+
+      var slug = slugify(fullText, MAX_KEY_LEN - tag.length - 5);
+      var key = slug.length >= 3 ? (tag + '-' + slug) : (tag + '-' + i);
+
+      if (usedKeys[key]) {
+        var suf = 2;
+        while (usedKeys[key + '-' + suf]) suf++;
+        key = key + '-' + suf;
+      }
+      usedKeys[key] = 1;
+
+      found.push({
+        el: el,
+        key: key,
+        value: value,
+        tag: tag,
+        content_type: hasMk ? 'richtext' : 'text'
+      });
+    }
+
+    return found;
+  }
+
+  Fetcher.prototype.discover = function (items) {
+    if (!items || !items.length) return Promise.resolve({ created: [], existing: [] });
+    var self = this;
+    var url = self.url('/public/content/discover');
+
+    return fetch(url, {
+      method: 'POST',
+      headers: self.hdrs(),
+      credentials: 'omit',
+      body: JSON.stringify({ website_id: self.w, items: items }),
+    }).then(function (res) {
+      if (res.ok) return res.json();
+      if (res.status === 401) throw new Error('Invalid API key');
+      if (res.status === 403) throw new Error('Auto-discover requires a write-scoped API key (cms_sk_...)');
+      throw new Error('Discover failed: HTTP ' + res.status);
+    });
+  };
+
+  /* ─── ReactCMS ───────────────────────────────────────────────────────────── */
+
+  /**
+   * @constructor
+   * @param {Object}   cfg
+   * @param {string}   cfg.apiKey    - Your API key (cms_pk_... or cms_sk_...)
+   * @param {string}   cfg.websiteId - Your website UUID
+   * @param {string}   [cfg.apiUrl]  - Override the API base URL
+   * @param {boolean}  [cfg.preview] - Preview / draft mode (requires write key)
+   * @param {number}   [cfg.cacheTtl]- In-memory + localStorage TTL in ms (default 60000)
+   * @param {Function} [cfg.onLoad]  - Callback(key, value, el) on each resolved item
+   * @param {Function} [cfg.onError] - Callback(key, Error, el|null) on failures
+   */
+  function ReactCMS(cfg) {
+    if (!cfg)           throw new Error(TAG + ' config is required');
+    if (!cfg.apiKey)    throw new Error(TAG + ' apiKey is required');
+    if (!cfg.websiteId) throw new Error(TAG + ' websiteId is required');
+
+    this._c = {
+      apiKey:    cfg.apiKey,
+      websiteId: cfg.websiteId,
+      apiUrl:    cfg.apiUrl   || API_URL,
+      preview:   cfg.preview  || false,
+      cacheTtl:  cfg.cacheTtl || CACHE_TTL,
+      onLoad:    cfg.onLoad   || function () {},
+      onError:   cfg.onError  || function () {},
+    };
+
+    this._cache  = new Cache(this._c.websiteId, this._c.cacheTtl);
+    this._fetch  = new Fetcher(this._c);
+    this._stop   = null;
+
+    log('info', 'v' + V + ' ready · website:', this._c.websiteId);
+  }
+
+  /**
+   * Scan the DOM for [data-cms] elements and load content into them.
+   * Returns a Promise that resolves when all content has been applied.
+   *
+   * @param {Element|Document} [root] - Scope of the scan (default: document)
+   * @returns {Promise<void>}
+   */
+  ReactCMS.prototype.load = function (root) {
+    var found = scan(root);
+    return found.length ? this._run(found) : Promise.resolve();
+  };
+
+  /**
+   * Fetch a single key by name and optionally apply it to an element.
+   *
+   * @param {string}  key  - The data-cms key to fetch
+   * @param {Element} [el] - Element to apply the content to
+   * @returns {Promise<Object|null>}
+   */
+  ReactCMS.prototype.loadKey = function (key, el) {
+    var self = this;
+    var hit  = self._cache.get(key);
+    if (hit) {
+      if (el) { apply(resolveEl(el) || { el: el, key: key, mode: 'auto', attr: null, fb: '' }, hit); self._c.onLoad(key, hit.value, el); }
+      return Promise.resolve(hit);
+    }
+    return self._fetch.one(key)
+      .then(function (item) {
+        if (!item) return null;
+        self._cache.set(item);
+        if (el) { apply(resolveEl(el) || { el: el, key: key, mode: 'auto', attr: null, fb: '' }, item); self._c.onLoad(key, item.value, el); }
+        return item;
+      })
+      .catch(function (err) { self._c.onError(key, err, el || null); return null; });
+  };
+
+  /**
+   * Start watching the DOM for dynamically added [data-cms] elements.
+   * Automatically fetches and populates them as they appear.
+   *
+   * @param {Element|Document} [root]
+   */
+  ReactCMS.prototype.observe = function (root) {
+    if (this._stop) return;
+    var self = this;
+    this._stop = watch(root || document, function (els) { self._run(els); });
+  };
+
+  /** Stop the MutationObserver. */
+  ReactCMS.prototype.stopObserving = function () {
+    if (this._stop) { this._stop(); this._stop = null; }
+  };
+
+  /**
+   * Invalidate a specific key from both the in-memory and localStorage cache.
+   * @param {string} key
+   */
+  ReactCMS.prototype.invalidate    = function (k) { this._cache.drop(k);    };
+
+  /** Invalidate all cached content for this website. */
+  ReactCMS.prototype.invalidateAll = function ()  { this._cache.dropAll();  };
+
+  /**
+   * Auto-discover all text-bearing elements on the page, register them in the CMS,
+   * and inject data-cms attributes so they become managed.
+   * Requires a write-scoped API key (cms_sk_...).
+   *
+   * @param {Element|Document} [root]
+   * @returns {Promise<{created:string[], existing:string[], total:number}>}
+   */
+  ReactCMS.prototype.discover = function (root) {
+    var self = this;
+    var found = discoverElements(root);
+    if (!found.length) {
+      log('info', 'Auto-discover found no text elements to register');
+      return Promise.resolve({ created: [], existing: [], total: 0 });
+    }
+
+    log('info', 'Auto-discover found ' + found.length + ' text elements');
+
+    var items = found.map(function (d) {
+      return { key: d.key, value: d.value, content_type: d.content_type };
+    });
+
+    return self._fetch.discover(items)
+      .then(function (result) {
+        // Inject data-cms attributes so the elements become managed
+        found.forEach(function (d) {
+          d.el.setAttribute(A_KEY, d.key);
+        });
+        log('info', 'Auto-discover registered ' + result.created.length + ' new keys, '
+          + result.existing.length + ' already existed');
+        return { created: result.created, existing: result.existing, total: found.length };
+      })
+      .catch(function (err) {
+        log('error', 'Auto-discover failed', err);
+        throw err;
+      });
+  };
+
+  /* Internal: resolve elements, split cache hits/misses, fetch misses */
+  ReactCMS.prototype._run = function (list) {
+    var self = this;
+    var map  = Object.create(null); // key -> [r]
+    list.forEach(function (r) { (map[r.key] || (map[r.key] = [])).push(r); });
+
+    var all   = uniq(list);
+    var misses = [];
+
+    all.forEach(function (k) {
+      var hit = self._cache.get(k);
+      if (hit) {
+        map[k].forEach(function (r) { apply(r, hit); self._c.onLoad(k, hit.value, r.el); });
+      } else {
+        misses.push(k);
+        markLoad(map[k]);
+      }
+    });
+
+    if (!misses.length) return Promise.resolve();
+
+    return self._fetch.batch(misses)
+      .then(function (fetched) {
+        fetched.forEach(function (item, k) {
+          self._cache.set(item);
+          (map[k] || []).forEach(function (r) { apply(r, item); self._c.onLoad(k, item.value, r.el); });
+        });
+        misses.forEach(function (k) {
+          if (!fetched.has(k)) {
+            (map[k] || []).forEach(function (r) {
+              fallback(r);
+              self._c.onError(k, new Error('Key "' + k + '" not found or unpublished'), r.el);
+            });
+          }
+        });
+      })
+      .catch(function (err) {
+        misses.forEach(function (k) {
+          (map[k] || []).forEach(function (r) { fallback(r); self._c.onError(k, err, r.el); });
+        });
+      });
+  };
+
+  /* ─── Auto-init ──────────────────────────────────────────────────────────── */
+
+  (function autoInit() {
+    var cfg = scriptCfg();
+    if (!cfg.apiKey) return;
+    if (!cfg.websiteId) { log('warn', 'data-website missing on <script> — add data-website="your-uuid"'); return; }
+
+    var cms = new ReactCMS({
+      apiKey:    cfg.apiKey,
+      websiteId: cfg.websiteId,
+      apiUrl:    cfg.apiUrl   || undefined,
+      preview:   cfg.preview  || false,
+      cacheTtl:  cfg.cacheTtl || undefined,
+    });
+
+    if (typeof window !== 'undefined') window.ReactCMS = cms;
+
+    function run() {
+      var p = cfg.autoDiscover
+        ? cms.discover().then(function () { return cms.load(); })
+        : cms.load();
+      p.then(function () { cms.observe(); }).catch(function (e) { log('error', 'init failed', e); });
+    }
+
+    document.readyState === 'loading'
+      ? document.addEventListener('DOMContentLoaded', run, { once: true })
+      : run();
+  })();
+
+  return ReactCMS;
+});

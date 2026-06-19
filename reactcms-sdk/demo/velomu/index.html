@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!--
+    ┌─────────────────────────────────────────────────────────────────────┐
+    │  ReactCMS — meta tag integration                                    │
+    │  data-cms-type="attr" + data-cms-attr="content" sets the           │
+    │  attribute directly. Works for any element, not just <meta>.        │
+    └─────────────────────────────────────────────────────────────────────┘
+  -->
+  <title
+    data-cms="page-title"
+    data-cms-type="attr"
+    data-cms-attr="textContent"
+    data-cms-fallback="VeloMU — Mauritius On-Demand"
+  >VeloMU — Mauritius On-Demand</title>
+
+  <meta
+    name="description"
+    data-cms="page-description"
+    data-cms-type="attr"
+    data-cms-attr="content"
+    data-cms-fallback="Order food, parcels, and services across Mauritius."
+    content="Order food, parcels, and services across Mauritius."
+  />
+
+  <!--
+    ┌─────────────────────────────────────────────────────────────────────┐
+    │  STEP 1 — Include the SDK                                           │
+    │                                                                     │
+    │  data-key       Your API key (read-scoped: cms_pk_...)              │
+    │  data-website   Your website UUID from the dashboard                │
+    │  data-preview   "true" to show draft content (needs write key)      │
+    │  data-cache-ttl Cache TTL in ms (default: 60000 = 1 minute)        │
+    │                                                                     │
+    │  Auto-init: the SDK scans the DOM, batch-fetches all data-cms       │
+    │  keys in one request, applies them, then watches for new elements.  │
+    └─────────────────────────────────────────────────────────────────────┘
+  -->
+  <script
+    src="https://cdn.reactcms.io/sdk.js"
+    data-key="cms_pk_aB3xQ9mZkLpRvYtN8..."
+    data-website="a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+    data-preview="false"
+    data-cache-ttl="60000"
+  ></script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ── Reset & tokens ─────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --indigo:     #6366f1;
+      --indigo-dark:#4f46e5;
+      --amber:      #f59e0b;
+      --gray-50:    #f9fafb;
+      --gray-100:   #f3f4f6;
+      --gray-200:   #e5e7eb;
+      --gray-500:   #6b7280;
+      --gray-700:   #374151;
+      --gray-900:   #111827;
+      --radius-sm:  6px;
+      --radius-md:  10px;
+      --radius-lg:  16px;
+    }
+
+    html { -webkit-font-smoothing: antialiased; scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 16px;
+      line-height: 1.6;
+      color: var(--gray-900);
+      background: #fff;
+    }
+
+    /* ── SDK loading states ─────────────────────────────────────────────── */
+    /*
+      data-cms-loading  → added as soon as SDK identifies a cache-miss element
+      data-cms-loaded   → added after content is applied
+      data-cms-error    → added if the key is missing or unpublished
+    */
+
+    [data-cms-loading] {
+      position: relative;
+      overflow: hidden;
+      /* Hide existing text during load — fallback stays invisible */
+      color: transparent !important;
+      border-radius: 4px;
+    }
+
+    [data-cms-loading]::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        90deg,
+        var(--gray-100) 25%,
+        var(--gray-200) 50%,
+        var(--gray-100) 75%
+      );
+      background-size: 200% 100%;
+      animation: shimmer 1.4s ease infinite;
+    }
+
+    [data-cms-loaded] {
+      animation: fadeIn 0.2s ease;
+    }
+
+    /* Dim + show original fallback when key not found or fetch fails */
+    [data-cms-error] {
+      opacity: 0.5;
+    }
+
+    @keyframes shimmer {
+      0%   { background-position: 200% 0 }
+      100% { background-position: -200% 0 }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(2px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      [data-cms-loading]::after { animation: none; }
+      [data-cms-loaded]         { animation: none; }
+    }
+
+    /* ── Layout ─────────────────────────────────────────────────────────── */
+    .container { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+    .section   { padding: 80px 0; }
+    .section--gray { background: var(--gray-50); }
+
+    /* ── Navigation ─────────────────────────────────────────────────────── */
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(255,255,255,0.9);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--gray-200);
+    }
+    .nav-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 60px;
+    }
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+    .nav-logo-mark {
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      background: var(--indigo);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    /*
+      ┌────────────────────────────────────────────────────────┐
+      │  data-cms="brand-name"                                 │
+      │  The logo text. data-cms-fallback ensures the nav     │
+      │  always shows something even if the fetch fails.       │
+      └────────────────────────────────────────────────────────┘
+    */
+    .nav-brand {
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--gray-900);
+    }
+    .nav-links { display: flex; align-items: center; gap: 24px; }
+    .nav-link  { font-size: 14px; color: var(--gray-500); text-decoration: none; }
+    .nav-link:hover { color: var(--gray-900); }
+    /*
+      ┌────────────────────────────────────────────────────────┐
+      │  data-cms="nav-cta-label"                              │
+      │  Button text. CMS allows A/B testing copy without     │
+      │  redeploying the site.                                 │
+      └────────────────────────────────────────────────────────┘
+    */
+    .nav-cta {
+      display: inline-block;
+      padding: 8px 16px;
+      font-size: 14px;
+      font-weight: 500;
+      background: var(--indigo);
+      color: #fff;
+      border-radius: var(--radius-sm);
+      text-decoration: none;
+      transition: background 0.15s;
+    }
+    .nav-cta:hover { background: var(--indigo-dark); }
+
+    /* ── Hero ───────────────────────────────────────────────────────────── */
+    .hero { padding: 96px 0 80px; text-align: center; }
+
+    .hero-eyebrow {
+      display: inline-block;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--indigo);
+      background: #eef2ff;
+      padding: 4px 12px;
+      border-radius: 999px;
+      margin-bottom: 20px;
+    }
+
+    /*
+      ┌────────────────────────────────────────────────────────┐
+      │  data-cms="hero-title"                                 │
+      │  Plain text. SDK uses textContent = value.             │
+      │  data-cms-fallback is what renders before the API      │
+      │  responds — keeps the page useful without flash.       │
+      └────────────────────────────────────────────────────────┘
+    */
+    .hero-title {
+      font-size: clamp(2rem, 5vw, 3.25rem);
+      font-weight: 600;
+      line-height: 1.18;
+      letter-spacing: -0.025em;
+      color: var(--gray-900);
+      margin-bottom: 20px;
+      max-width: 680px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    /*
+      ┌────────────────────────────────────────────────────────┐
+      │  data-cms="hero-subtitle"  data-cms-type="html"        │
+      │  Explicit html mode lets editors use <strong>,         │
+      │  <em>, or line breaks in the dashboard.                │
+      └────────────────────────────────────────────────────────┘
+    */
+    .hero-subtitle {
+      font-size: 1.125rem;
+      color: var(--gray-500);
+      max-width: 520px;
+      margin: 0 auto 36px;
+      line-height: 1.7;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn-primary {
+      display: inline-block;
+      padding: 14px 28px;
+      font-size: 15px;
+      font-weight: 500;
+      background: var(--indigo);
+      color: #fff;
+      border-radius: var(--radius-sm);
+      text-decoration: none;
+      transition: background 0.15s;
+    }
+    .btn-primary:hover { background: var(--indigo-dark); }
+
+    .btn-secondary {
+      display: inline-block;
+      padding: 14px 28px;
+      font-size: 15px;
+      font-weight: 500;
+      background: #fff;
+      color: var(--gray-700);
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius-sm);
+      text-decoration: none;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .btn-secondary:hover { background: var(--gray-50); border-color: var(--gray-300); }
+
+    /* ── Hero image ─────────────────────────────────────────────────────── */
+    .hero-image-wrap {
+      margin-top: 56px;
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      border: 1px solid var(--gray-200);
+      box-shadow: 0 24px 64px -12px rgba(0,0,0,0.08);
+    }
+
+    /*
+      ┌────────────────────────────────────────────────────────┐
+      │  data-cms="hero-image"                                 │
+      │  <img> tag → SDK auto-detects src mode.                │
+      │  The API also returns metadata.alt which the SDK       │
+      │  applies automatically to the alt attribute.           │
+      └────────────────────────────────────────────────────────┘
+    */
+    .hero-image-wrap img {
+      display: block;
+      width: 100%;
+      height: 420px;
+      object-fit: cover;
+    }
+
+    /* ── Stats bar ──────────────────────────────────────────────────────── */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 1px;
+      background: var(--gray-200);
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      margin: 40px 0;
+    }
+    .stat {
+      background: #fff;
+      padding: 28px 24px;
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 1.75rem;
+      font-weight: 600;
+      color: var(--gray-900);
+      display: block;
+    }
+    .stat-label {
+      font-size: 13px;
+      color: var(--gray-500);
+      margin-top: 4px;
+    }
+
+    /* ── Features ───────────────────────────────────────────────────────── */
+    .features-header { text-align: center; margin-bottom: 52px; }
+    .section-eyebrow {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--indigo);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 12px;
+    }
+    .section-title {
+      font-size: clamp(1.5rem, 3vw, 2.25rem);
+      font-weight: 600;
+      color: var(--gray-900);
+      margin-bottom: 14px;
+    }
+    .section-body {
+      font-size: 1.0625rem;
+      color: var(--gray-500);
+      max-width: 480px;
+      margin: 0 auto;
+      line-height: 1.7;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+    }
+    .feature-card {
+      padding: 28px;
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius-md);
+      background: #fff;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .feature-card:hover {
+      border-color: #c7d2fe;
+      box-shadow: 0 4px 20px rgba(99,102,241,0.08);
+    }
+    .feature-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      background: #eef2ff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 16px;
+      font-size: 20px;
+    }
+    .feature-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--gray-900);
+      margin-bottom: 8px;
+    }
+    .feature-body {
+      font-size: 0.9375rem;
+      color: var(--gray-500);
+      line-height: 1.65;
+    }
+
+    /* ── Testimonial ────────────────────────────────────────────────────── */
+    .testimonial {
+      max-width: 640px;
+      margin: 0 auto;
+      text-align: center;
+    }
+    .testimonial-quote {
+      font-size: 1.25rem;
+      font-weight: 500;
+      color: var(--gray-900);
+      line-height: 1.55;
+      margin-bottom: 24px;
+      font-style: italic;
+    }
+    .testimonial-author { font-size: 14px; color: var(--gray-500); }
+    .testimonial-author strong { color: var(--gray-700); }
+
+    /* ── CTA section ────────────────────────────────────────────────────── */
+    .cta-section {
+      background: var(--indigo);
+      padding: 80px 0;
+      text-align: center;
+    }
+    .cta-title {
+      font-size: clamp(1.5rem, 3vw, 2.25rem);
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 14px;
+    }
+    .cta-body {
+      font-size: 1.0625rem;
+      color: rgba(255,255,255,0.7);
+      max-width: 440px;
+      margin: 0 auto 32px;
+    }
+    .btn-white {
+      display: inline-block;
+      padding: 14px 28px;
+      font-size: 15px;
+      font-weight: 500;
+      background: #fff;
+      color: var(--indigo);
+      border-radius: var(--radius-sm);
+      text-decoration: none;
+      transition: opacity 0.15s;
+    }
+    .btn-white:hover { opacity: 0.9; }
+
+    /* ── Footer ─────────────────────────────────────────────────────────── */
+    .footer {
+      background: var(--gray-900);
+      color: rgba(255,255,255,0.5);
+      padding: 48px 0;
+    }
+    .footer-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .footer-copy { font-size: 14px; }
+    .footer-links { display: flex; gap: 20px; }
+    .footer-link  { font-size: 14px; color: rgba(255,255,255,0.4); text-decoration: none; }
+    .footer-link:hover { color: rgba(255,255,255,0.8); }
+
+    /* ── Responsive ─────────────────────────────────────────────────────── */
+    @media (max-width: 640px) {
+      .nav-links { display: none; }
+      .hero { padding: 56px 0 48px; }
+      .hero-image-wrap img { height: 220px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     Navigation
+     ─────────────────────────────────────────────────────────────────────
+     Two data-cms elements: brand name and the CTA button label.
+     Both show sensible fallbacks immediately.
+════════════════════════════════════════════════════════════════════════ -->
+<header class="nav">
+  <div class="container">
+    <nav class="nav-inner" aria-label="Main navigation">
+      <a href="/" class="nav-logo">
+        <div class="nav-logo-mark" aria-hidden="true">V</div>
+        <span
+          class="nav-brand"
+          data-cms="brand-name"
+          data-cms-fallback="VeloMU"
+        >VeloMU</span>
+      </a>
+
+      <div class="nav-links">
+        <a href="#features" class="nav-link"
+           data-cms="nav-link-features"
+           data-cms-fallback="Features">Features</a>
+        <a href="#about" class="nav-link"
+           data-cms="nav-link-about"
+           data-cms-fallback="About">About</a>
+        <a href="#" class="nav-cta"
+           data-cms="nav-cta-label"
+           data-cms-fallback="Get the app">Get the app</a>
+      </div>
+    </nav>
+  </div>
+</header>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     Hero
+     ─────────────────────────────────────────────────────────────────────
+     Five distinct CMS keys. The SDK batch-fetches all of them in a
+     single POST /public/content/batch request on first load.
+════════════════════════════════════════════════════════════════════════ -->
+<section class="hero">
+  <div class="container">
+
+    <!--
+      data-cms-type is omitted here — the SDK infers "text" from the
+      span tag and sets textContent.
+    -->
+    <div
+      class="hero-eyebrow"
+      data-cms="hero-eyebrow"
+      data-cms-fallback="On-demand delivery · Mauritius"
+    >On-demand delivery · Mauritius</div>
+
+    <h1
+      class="hero-title"
+      data-cms="hero-title"
+      data-cms-fallback="Order food, parcels &amp; more"
+    >Order food, parcels &amp; more</h1>
+
+    <!--
+      data-cms-type="html" → SDK uses innerHTML.
+      Lets editors add <strong>, <br>, or other inline markup
+      without redeploying the page.
+    -->
+    <p
+      class="hero-subtitle"
+      data-cms="hero-subtitle"
+      data-cms-type="html"
+      data-cms-fallback="Mauritius's on-demand super app — food, parcels, and services delivered in under 40 minutes."
+    >Mauritius's on-demand super app — food, parcels, and services delivered in under 40 minutes.</p>
+
+    <div class="hero-actions">
+      <!--
+        The href and the button label are managed separately — editors
+        can update the URL or the copy independently from the dashboard.
+      -->
+      <a
+        class="btn-primary"
+        data-cms="hero-cta-url"
+        data-cms-type="href"
+        data-cms-fallback="/download"
+        href="/download"
+      ><span
+          data-cms="hero-cta-label"
+          data-cms-fallback="Download free"
+        >Download free</span></a>
+
+      <a
+        class="btn-secondary"
+        data-cms="hero-secondary-url"
+        data-cms-type="href"
+        data-cms-fallback="/how-it-works"
+        href="/how-it-works"
+      ><span
+          data-cms="hero-secondary-label"
+          data-cms-fallback="See how it works"
+        >See how it works</span></a>
+    </div>
+
+    <div class="hero-image-wrap">
+      <!--
+        <img> → SDK auto-detects src mode (no data-cms-type needed).
+        The API response also includes metadata.alt, which the SDK
+        applies to the alt attribute automatically.
+      -->
+      <img
+        data-cms="hero-image"
+        data-cms-fallback="https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200&q=70"
+        src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200&q=70"
+        alt="VeloMU delivery app"
+        loading="eager"
+      />
+    </div>
+
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     Stats bar — four numbers editable from the dashboard
+════════════════════════════════════════════════════════════════════════ -->
+<div class="container">
+  <div class="stats">
+    <div class="stat">
+      <span class="stat-value" data-cms="stat-1-value" data-cms-fallback="1,200+">1,200+</span>
+      <span class="stat-label" data-cms="stat-1-label" data-cms-fallback="Restaurants">Restaurants</span>
+    </div>
+    <div class="stat">
+      <span class="stat-value" data-cms="stat-2-value" data-cms-fallback="38 min">38 min</span>
+      <span class="stat-label" data-cms="stat-2-label" data-cms-fallback="Avg. delivery time">Avg. delivery time</span>
+    </div>
+    <div class="stat">
+      <span class="stat-value" data-cms="stat-3-value" data-cms-fallback="50,000+">50,000+</span>
+      <span class="stat-label" data-cms="stat-3-label" data-cms-fallback="Active users">Active users</span>
+    </div>
+    <div class="stat">
+      <span class="stat-value" data-cms="stat-4-value" data-cms-fallback="4.8 ★">4.8 ★</span>
+      <span class="stat-label" data-cms="stat-4-label" data-cms-fallback="App Store rating">App Store rating</span>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     Features
+     ─────────────────────────────────────────────────────────────────────
+     The section heading, subheading, and each card's title + body are
+     independently editable. Nine CMS keys total — still one API call.
+════════════════════════════════════════════════════════════════════════ -->
+<section class="section" id="features">
+  <div class="container">
+
+    <div class="features-header">
+      <p class="section-eyebrow"
+         data-cms="features-eyebrow"
+         data-cms-fallback="Everything you need">Everything you need</p>
+      <h2 class="section-title"
+          data-cms="features-title"
+          data-cms-fallback="Mauritius, on demand">Mauritius, on demand</h2>
+      <p class="section-body"
+         data-cms="features-body"
+         data-cms-type="html"
+         data-cms-fallback="One app for everything — food, parcels, and everyday services, all tracked in real time.">One app for everything — food, parcels, and everyday services, all tracked in real time.</p>
+    </div>
+
+    <div class="features-grid">
+
+      <div class="feature-card">
+        <div class="feature-icon" aria-hidden="true">🍔</div>
+        <h3 class="feature-title"
+            data-cms="feat-1-title"
+            data-cms-fallback="Food delivery">Food delivery</h3>
+        <p class="feature-body"
+           data-cms="feat-1-body"
+           data-cms-type="html"
+           data-cms-fallback="1,200+ restaurants across the island. Breakfast to midnight snacks — everything delivered in under 40 minutes.">1,200+ restaurants across the island. Breakfast to midnight snacks — everything delivered in under 40 minutes.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon" aria-hidden="true">📦</div>
+        <h3 class="feature-title"
+            data-cms="feat-2-title"
+            data-cms-fallback="Parcel courier">Parcel courier</h3>
+        <p class="feature-body"
+           data-cms="feat-2-body"
+           data-cms-type="html"
+           data-cms-fallback="Same-day delivery anywhere on the island. GPS tracking from pickup to doorstep, with photo confirmation.">Same-day delivery anywhere on the island. GPS tracking from pickup to doorstep, with photo confirmation.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon" aria-hidden="true">🔧</div>
+        <h3 class="feature-title"
+            data-cms="feat-3-title"
+            data-cms-fallback="Services">Services</h3>
+        <p class="feature-body"
+           data-cms="feat-3-body"
+           data-cms-type="html"
+           data-cms-fallback="Plumbers, cleaners, tutors, electricians — vetted and available on demand. Book in under 2 minutes.">Plumbers, cleaners, tutors, electricians — vetted and available on demand. Book in under 2 minutes.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     Testimonial
+════════════════════════════════════════════════════════════════════════ -->
+<section class="section section--gray" id="about">
+  <div class="container">
+    <div class="testimonial">
+      <!--
+        data-cms-type="html" on a blockquote lets editors use curly
+        quotes or emphasis marks in their copy.
+      -->
+      <blockquote
+        class="testimonial-quote"
+        data-cms="testimonial-quote"
+        data-cms-type="html"
+        data-cms-fallback="&ldquo;VeloMU changed how I run my restaurant. Orders come in automatically, delivery is handled, and I can focus on cooking.&rdquo;"
+      >&ldquo;VeloMU changed how I run my restaurant. Orders come in automatically, delivery is handled, and I can focus on cooking.&rdquo;</blockquote>
+      <p class="testimonial-author">
+        <strong
+          data-cms="testimonial-name"
+          data-cms-fallback="Priya Ramjuttun"
+        >Priya Ramjuttun</strong>
+        <span
+          data-cms="testimonial-role"
+          data-cms-fallback=" · Owner, Spice Garden, Quatre Bornes"
+        > · Owner, Spice Garden, Quatre Bornes</span>
+      </p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     CTA section
+════════════════════════════════════════════════════════════════════════ -->
+<section class="cta-section">
+  <div class="container">
+    <h2
+      class="cta-title"
+      data-cms="cta-title"
+      data-cms-fallback="Ready to order?"
+    >Ready to order?</h2>
+    <p
+      class="cta-body"
+      data-cms="cta-body"
+      data-cms-fallback="Join 50,000+ Mauritians already using VeloMU."
+    >Join 50,000+ Mauritians already using VeloMU.</p>
+    <a
+      class="btn-white"
+      data-cms="cta-button-url"
+      data-cms-type="href"
+      data-cms-fallback="https://app.velomu.mu/register"
+      href="https://app.velomu.mu/register"
+    ><span
+        data-cms="cta-button-label"
+        data-cms-fallback="Get started — it's free"
+      >Get started — it's free</span></a>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     Footer
+════════════════════════════════════════════════════════════════════════ -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-inner">
+      <p
+        class="footer-copy"
+        data-cms="footer-copy"
+        data-cms-fallback="© 2026 VeloMU Ltd. All rights reserved."
+      >© 2026 VeloMU Ltd. All rights reserved.</p>
+      <nav class="footer-links" aria-label="Footer navigation">
+        <a href="/privacy" class="footer-link"
+           data-cms="footer-link-privacy"
+           data-cms-fallback="Privacy">Privacy</a>
+        <a href="/terms" class="footer-link"
+           data-cms="footer-link-terms"
+           data-cms-fallback="Terms">Terms</a>
+        <a href="/contact" class="footer-link"
+           data-cms="footer-link-contact"
+           data-cms-fallback="Contact">Contact</a>
+      </nav>
+    </div>
+  </div>
+</footer>
+
+
+<!--
+  ════════════════════════════════════════════════════════════════════════
+  STEP 3 — Optional: manual SDK usage for advanced scenarios
+  ════════════════════════════════════════════════════════════════════════
+
+  The auto-init above handles 95% of cases. These examples show how to
+  use the window.ReactCMS instance the SDK exposes for custom behaviour.
+-->
+<script>
+  /**
+   * window.ReactCMS is the auto-init instance created by the SDK.
+   * It's available after DOMContentLoaded.
+   */
+  document.addEventListener('DOMContentLoaded', function () {
+    var cms = window.ReactCMS;
+    if (!cms) return; // SDK not loaded (e.g., ad blocker, wrong URL)
+
+    // ── Example 1: Fetch a key programmatically ───────────────────────
+    // Useful for values you want in JS but not in the DOM.
+    cms.loadKey('promo-banner-active').then(function (item) {
+      if (item && item.value === 'true') {
+        var banner = document.createElement('div');
+        banner.style.cssText = [
+          'position:fixed;bottom:20px;right:20px',
+          'background:#6366f1;color:#fff',
+          'padding:12px 18px;border-radius:10px',
+          'font-size:14px;font-weight:500',
+          'box-shadow:0 4px 16px rgba(99,102,241,0.3)',
+          'cursor:pointer;z-index:1000',
+        ].join(';');
+        banner.textContent = '🎉 Free delivery today — use code VELOMU';
+        banner.onclick = function () { banner.remove(); };
+        document.body.appendChild(banner);
+      }
+    });
+
+    // ── Example 2: Inject dynamic content after user interaction ──────
+    // The MutationObserver (started by cms.observe() inside load())
+    // will automatically fetch and populate any new [data-cms] element
+    // added to the DOM — no manual call required.
+    document.querySelector('.btn-primary')?.addEventListener('click', function (e) {
+      // Dynamically create a modal with a data-cms element
+      var modal = document.createElement('div');
+      modal.style.cssText = [
+        'position:fixed;inset:0;background:rgba(0,0,0,0.5)',
+        'display:flex;align-items:center;justify-content:center;z-index:2000'
+      ].join(';');
+      modal.innerHTML = [
+        '<div style="background:#fff;border-radius:12px;padding:32px;max-width:380px;width:90%">',
+        '  <h3 style="font-size:18px;font-weight:600;margin-bottom:8px"',
+        '      data-cms="modal-title" data-cms-fallback="Download VeloMU">',
+        '    Download VeloMU',
+        '  </h3>',
+        '  <p style="color:#6b7280;font-size:14px;margin-bottom:20px"',
+        '     data-cms="modal-body" data-cms-fallback="Available on iOS and Android.">',
+        '    Available on iOS and Android.',
+        '  </p>',
+        '  <button onclick="this.closest(\'[style*=fixed]\').remove()"',
+        '          style="padding:10px 20px;background:#6366f1;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:500">',
+        '    Close',
+        '  </button>',
+        '</div>'
+      ].join('');
+      document.body.appendChild(modal);
+      // The MutationObserver picks up modal-title and modal-body
+      // automatically — they'll be populated within ~100ms
+    });
+
+    // ── Example 3: Invalidate cache after a user-triggered event ──────
+    // E.g., after a user action that might change published content.
+    window.refreshCMSContent = function () {
+      cms.invalidateAll();         // clear all cached keys
+      cms.load();                  // re-fetch and re-apply everything
+    };
+
+  });
+</script>
+
+</body>
+</html>

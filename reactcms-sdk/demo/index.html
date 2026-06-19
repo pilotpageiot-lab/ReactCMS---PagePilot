@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title data-cms="page-title" data-cms-type="attr" data-cms-attr="content" data-cms-fallback="ReactCMS Demo">ReactCMS Demo</title>
+  <meta property="og:title" data-cms="og-title" data-cms-type="attr" data-cms-attr="content" data-cms-fallback="ReactCMS" />
+
+  <!--
+    ╔══════════════════════════════════════════════════════════════╗
+    ║  ReactCMS SDK — Auto-init via script attributes             ║
+    ║  Replace data-key and data-website with your own values.    ║
+    ╚══════════════════════════════════════════════════════════════╝
+  -->
+  <script
+    src="../dist/sdk.js"
+    data-key="cms_pk_your_api_key_here"
+    data-website="your-website-uuid-here"
+    data-api-url="http://localhost:3001"
+    data-preview="false"
+    data-cache-ttl="60000"
+  ></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; color: #1a1a2e; background: #f8f9fa; line-height: 1.6; }
+
+    /* ── SDK loading states ───────────────────────────────────────────────── */
+    [data-cms-loading] {
+      position: relative;
+      overflow: hidden;
+      color: transparent !important;
+    }
+    [data-cms-loading]::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s ease infinite;
+      border-radius: 4px;
+    }
+    @keyframes shimmer {
+      0% { background-position: 200% 0 }
+      100% { background-position: -200% 0 }
+    }
+    [data-cms-error] { opacity: 0.5; }
+    [data-cms-loaded] { transition: opacity 0.2s; }
+
+    /* ── Page layout ─────────────────────────────────────────────────────── */
+    .container { max-width: 860px; margin: 0 auto; padding: 32px 20px; }
+    .badge { display: inline-block; background: #6366f1; color: #fff; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; letter-spacing: .04em; }
+    h1 { font-size: 2.4rem; font-weight: 700; line-height: 1.2; margin: 12px 0 8px; }
+    .subtitle { font-size: 1.15rem; color: #555; margin-bottom: 40px; }
+
+    /* ── Hero image ──────────────────────────────────────────────────────── */
+    .hero-img { width: 100%; max-height: 340px; object-fit: cover; border-radius: 12px; margin-bottom: 40px; background: #e5e7eb; min-height: 160px; }
+
+    /* ── Cards ───────────────────────────────────────────────────────────── */
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 40px; }
+    .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 24px; }
+    .card h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 8px; }
+    .card p { color: #555; font-size: 0.95rem; }
+    .card .cta { display: inline-block; margin-top: 14px; color: #6366f1; font-weight: 600; text-decoration: none; font-size: 0.9rem; }
+
+    /* ── Rich text zone ──────────────────────────────────────────────────── */
+    .richtext-demo { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 28px; margin-bottom: 40px; }
+    .richtext-demo h2 { font-size: 1.3rem; font-weight: 700; margin-bottom: 6px; }
+    .richtext-content h2, .richtext-content h3 { margin: 12px 0 6px; font-weight: 600; }
+    .richtext-content p  { margin-bottom: 10px; color: #444; }
+    .richtext-content ul { margin: 8px 0 10px 20px; color: #444; }
+
+    /* ── Dynamic demo ────────────────────────────────────────────────────── */
+    .dynamic-demo { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 28px; margin-bottom: 40px; }
+    .dynamic-demo h2 { font-size: 1.2rem; font-weight: 700; margin-bottom: 12px; }
+    #dynamic-output { margin-top: 14px; display: grid; gap: 10px; }
+    .dynamic-card { background: #f8f9fa; border-radius: 8px; padding: 16px; border-left: 3px solid #6366f1; }
+
+    /* ── Manual API demo ─────────────────────────────────────────────────── */
+    .manual-demo { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 28px; margin-bottom: 40px; }
+    .manual-demo h2 { font-size: 1.2rem; font-weight: 700; margin-bottom: 12px; }
+    .input-row { display: flex; gap: 10px; }
+    .input-row input { flex: 1; border: 1px solid #d1d5db; border-radius: 8px; padding: 8px 12px; font-size: 14px; }
+    .input-row button { background: #6366f1; color: #fff; border: none; border-radius: 8px; padding: 8px 18px; font-weight: 600; cursor: pointer; font-size: 14px; }
+    .input-row button:hover { background: #4f46e5; }
+    #manual-result { margin-top: 14px; font-size: 14px; color: #444; min-height: 24px; }
+
+    /* ── Log panel ───────────────────────────────────────────────────────── */
+    .log-panel { background: #1a1a2e; color: #a5f3fc; border-radius: 12px; padding: 20px; font-family: monospace; font-size: 13px; line-height: 1.8; }
+    .log-panel h2 { color: #e2e8f0; font-size: 1rem; margin-bottom: 10px; }
+    #log-output { max-height: 200px; overflow-y: auto; }
+    .log-entry { display: flex; gap: 10px; }
+    .log-ts { color: #6b7280; flex-shrink: 0; }
+    .log-ok  { color: #6ee7b7; }
+    .log-err { color: #fca5a5; }
+
+    /* ── Footer ──────────────────────────────────────────────────────────── */
+    footer { text-align: center; font-size: 13px; color: #9ca3af; margin-top: 40px; padding-bottom: 32px; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ── Hero section ──────────────────────────────────────────────────────── -->
+  <p><span class="badge">ReactCMS</span></p>
+
+  <h1 data-cms="hero-title" data-cms-fallback="Welcome to ReactCMS">
+    Welcome to ReactCMS
+  </h1>
+
+  <p class="subtitle" data-cms="hero-subtitle" data-cms-fallback="Edit any content on this page from your dashboard.">
+    Edit any content on this page from your dashboard.
+  </p>
+
+  <!--
+    Image element — SDK infers mode='src' from the <img> tag automatically.
+    Provides alt text via data-cms-attr isn't needed here because the API
+    returns metadata.alt which the SDK applies automatically.
+  -->
+  <img
+    class="hero-img"
+    data-cms="hero-image"
+    data-cms-fallback="https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=900&q=60"
+    src="https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=900&q=60"
+    alt="Hero image"
+  />
+
+  <!-- ── Feature cards ─────────────────────────────────────────────────────── -->
+  <div class="grid">
+    <div class="card">
+      <h3 data-cms="feature-1-title" data-cms-fallback="Zero config">Zero config</h3>
+      <p data-cms="feature-1-body" data-cms-fallback="Add one script tag. The SDK scans your HTML and populates every data-cms element automatically.">
+        Add one script tag. The SDK scans your HTML and populates every data-cms element automatically.
+      </p>
+      <a href="#" class="cta" data-cms="feature-1-cta" data-cms-type="text" data-cms-fallback="Learn more →">Learn more →</a>
+    </div>
+    <div class="card">
+      <h3 data-cms="feature-2-title" data-cms-fallback="Smart caching">Smart caching</h3>
+      <p data-cms="feature-2-body" data-cms-fallback="In-memory and localStorage caching means instant loads for repeat visitors, with automatic TTL expiry.">
+        In-memory and localStorage caching means instant loads for repeat visitors, with automatic TTL expiry.
+      </p>
+    </div>
+    <div class="card">
+      <h3 data-cms="feature-3-title" data-cms-fallback="Any element">Any element</h3>
+      <p data-cms="feature-3-body" data-cms-fallback="Text, images, rich HTML, JSON, links, inputs — the SDK auto-detects the right way to apply each content type.">
+        Text, images, rich HTML, JSON, links, inputs — the SDK auto-detects the right way to apply each content type.
+      </p>
+    </div>
+  </div>
+
+  <!-- ── Rich text demo ────────────────────────────────────────────────────── -->
+  <div class="richtext-demo">
+    <h2>Rich text</h2>
+    <!--
+      data-cms-type="html" tells the SDK to use el.innerHTML = value.
+      Without it, richtext content_type is auto-detected and also uses innerHTML.
+    -->
+    <div
+      class="richtext-content"
+      data-cms="about-body"
+      data-cms-type="html"
+      data-cms-fallback="<p>This content is managed in your ReactCMS dashboard. You can use <strong>rich text</strong>, headings, and lists.</p>"
+    >
+      <p>This content is managed in your ReactCMS dashboard. You can use <strong>rich text</strong>, headings, and lists.</p>
+    </div>
+  </div>
+
+  <!-- ── Input element demo ────────────────────────────────────────────────── -->
+  <div class="card" style="margin-bottom:24px">
+    <h3>Form default values</h3>
+    <p style="margin-bottom:12px">Inputs and textareas get their value attribute set:</p>
+    <input
+      type="text"
+      data-cms="form-placeholder-name"
+      data-cms-type="value"
+      data-cms-fallback="Enter your name"
+      style="border:1px solid #d1d5db;border-radius:8px;padding:8px 12px;width:100%;font-size:14px;margin-bottom:8px"
+    />
+    <!--
+      Link href example — data-cms-type="href" or auto-detected from <a> tag
+    -->
+    <a
+      href="https://reactcms.io"
+      data-cms="nav-cta-url"
+      data-cms-type="href"
+      data-cms-fallback="https://reactcms.io"
+      style="color:#6366f1;font-size:14px"
+    >
+      <span data-cms="nav-cta-label" data-cms-fallback="Get started free →">Get started free →</span>
+    </a>
+  </div>
+
+  <!-- ── Dynamic content demo ──────────────────────────────────────────────── -->
+  <div class="dynamic-demo">
+    <h2>Dynamic injection (MutationObserver)</h2>
+    <p style="color:#555;font-size:14px;margin-bottom:8px">
+      The SDK watches for new <code>[data-cms]</code> elements added after page load.
+      Click the button to inject a card — it will be populated automatically.
+    </p>
+    <button onclick="injectCard()" style="background:#6366f1;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-weight:600;cursor:pointer;font-size:14px">
+      Inject dynamic card
+    </button>
+    <div id="dynamic-output"></div>
+  </div>
+
+  <!-- ── Manual loadKey demo ───────────────────────────────────────────────── -->
+  <div class="manual-demo">
+    <h2>Manual API — <code>cms.loadKey()</code></h2>
+    <p style="color:#555;font-size:14px;margin-bottom:12px">
+      Fetch any key programmatically and handle the value in your own code.
+    </p>
+    <div class="input-row">
+      <input id="manual-input" type="text" placeholder="e.g. hero-title" value="hero-title" />
+      <button onclick="fetchManual()">Fetch</button>
+    </div>
+    <div id="manual-result"></div>
+  </div>
+
+  <!-- ── Event log ─────────────────────────────────────────────────────────── -->
+  <div class="log-panel">
+    <h2>SDK event log</h2>
+    <div id="log-output"><div class="log-entry"><span class="log-ts">—</span><span>Waiting for SDK…</span></div></div>
+  </div>
+
+  <footer>
+    ReactCMS SDK v1.0.0 · <a href="https://reactcms.io" style="color:#6366f1">reactcms.io</a>
+  </footer>
+</div>
+
+<script>
+  // ── Wait for SDK to be ready ───────────────────────────────────────────────
+  // The auto-init creates window.ReactCMS when it runs.
+  // If you need to hook in before DOMContentLoaded, use the manual init below.
+
+  var logEl = document.getElementById('log-output');
+  var cardCount = 0;
+
+  function addLog(msg, isError) {
+    var ts = new Date().toLocaleTimeString();
+    var entry = document.createElement('div');
+    entry.className = 'log-entry';
+    entry.innerHTML =
+      '<span class="log-ts">' + ts + '</span>' +
+      '<span class="' + (isError ? 'log-err' : 'log-ok') + '">' + msg + '</span>';
+    logEl.appendChild(entry);
+    logEl.scrollTop = logEl.scrollHeight;
+    // Remove "waiting" placeholder
+    if (logEl.children.length === 2) logEl.children[0].remove();
+  }
+
+  // Override the auto-init's cms with one that logs events
+  // (We wait a tick so auto-init has already run)
+  document.addEventListener('DOMContentLoaded', function () {
+    // The auto-init instance is on window.ReactCMS
+    // Re-init with logging callbacks for this demo page:
+    if (typeof ReactCMSClass !== 'undefined') {
+      var scriptTag = document.querySelector('script[data-key]');
+      if (scriptTag && scriptTag.getAttribute('data-key') !== 'cms_pk_your_api_key_here') {
+        window.ReactCMS = new ReactCMSClass({
+          apiKey:    scriptTag.getAttribute('data-key'),
+          websiteId: scriptTag.getAttribute('data-website'),
+          apiUrl:    scriptTag.getAttribute('data-api-url') || undefined,
+          preview:   scriptTag.getAttribute('data-preview') === 'true',
+          onLoad: function (key, value, el) {
+            addLog('✓ ' + key + ' → ' + (value ? value.slice(0, 40) + (value.length > 40 ? '…' : '') : 'null'));
+          },
+          onError: function (key, err, el) {
+            addLog('✗ ' + key + ': ' + err.message, true);
+          },
+        });
+        window.ReactCMS.load().then(function () {
+          window.ReactCMS.observe();
+        });
+      } else {
+        addLog('⚠ Using fallback content (no real API key configured)', true);
+      }
+    }
+  });
+
+  // ── Dynamic injection ──────────────────────────────────────────────────────
+  function injectCard() {
+    cardCount++;
+    var div = document.createElement('div');
+    div.className = 'dynamic-card';
+    // These elements will be auto-detected by the MutationObserver
+    div.innerHTML =
+      '<strong data-cms="feature-' + cardCount + '-title" ' +
+      'data-cms-fallback="Injected card ' + cardCount + '">Loading…</strong>' +
+      '<p data-cms="feature-' + cardCount + '-body" ' +
+      'data-cms-fallback="This card was injected after page load and auto-populated by the SDK.">Loading…</p>';
+    document.getElementById('dynamic-output').appendChild(div);
+  }
+
+  // ── Manual loadKey ─────────────────────────────────────────────────────────
+  function fetchManual() {
+    var key = document.getElementById('manual-input').value.trim();
+    if (!key) return;
+    var result = document.getElementById('manual-result');
+    result.textContent = 'Fetching ' + key + '…';
+
+    if (!window.ReactCMS) {
+      result.textContent = 'SDK not yet ready.';
+      return;
+    }
+
+    window.ReactCMS.loadKey(key).then(function (item) {
+      if (item) {
+        result.innerHTML =
+          '<strong>' + key + '</strong> (v' + item.version + ', ' + item.content_type + '):<br>' +
+          '<code style="word-break:break-all">' + (item.value || '(empty)') + '</code>';
+      } else {
+        result.textContent = 'Key "' + key + '" not found or not published.';
+      }
+    }).catch(function (err) {
+      result.textContent = 'Error: ' + err.message;
+    });
+  }
+</script>
+</body>
+</html>

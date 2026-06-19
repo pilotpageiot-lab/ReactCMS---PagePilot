@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ReactCMS SDK Tests</title>
+  <script src="../dist/sdk.js"></script>
+  <style>
+    body { font-family: monospace; font-size: 13px; padding: 20px; background: #1a1a2e; color: #a5f3fc; }
+    h1 { color: #e2e8f0; font-size: 16px; margin-bottom: 16px; }
+    .pass { color: #6ee7b7; }
+    .fail { color: #fca5a5; }
+    #results { margin-top: 16px; padding: 12px; background: #0d1117; border-radius: 8px; font-size: 14px; }
+  </style>
+</head>
+<body>
+<h1>ReactCMS SDK — Test Runner</h1>
+<p>Open DevTools console to see full output.</p>
+<div id="results">Running tests…</div>
+<script>
+  // Override console to display in page
+  var out = document.getElementById('results');
+  function addLine(msg, cls) {
+    var p = document.createElement('p');
+    if (cls) p.className = cls;
+    p.textContent = msg;
+    out.appendChild(p);
+  }
+
+  var origLog  = console.log.bind(console);
+  var origErr  = console.error.bind(console);
+  var origInfo = console.info.bind(console);
+  var origWarn = console.warn.bind(console);
+  var origGrp  = console.group.bind(console);
+  var origGrpE = console.groupEnd.bind(console);
+
+  console.log   = function(m) { origLog(m);  if (m && m.toString().indexOf('✓') !== -1) addLine(m, 'pass'); else addLine(m); };
+  console.error = function(m) { origErr(m);  addLine(m, 'fail'); };
+  console.info  = function() {};
+  console.warn  = function(m) { origWarn(m); };
+  console.group = function(m) { origGrp(m);  addLine('▶ ' + m); };
+  console.groupEnd = function() { origGrpE(); };
+</script>
+<script type="module">
+  // JSDOM-like shims for browser environment
+  if (!globalThis.fetch) {
+    throw new Error('This browser does not support fetch — use a modern browser');
+  }
+  // global.fetch will be set by tests to mock network
+  globalThis.global = globalThis;
+
+  try {
+    // Dynamically import and run tests
+    const { default: run } = await import('./sdk.test.js?t=' + Date.now());
+  } catch(e) {
+    document.getElementById('results').innerHTML += '<p class="fail">Import error: ' + e.message + '</p>';
+    console.error('Failed to load tests: ' + e.message);
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Build output
+reactcms-backend/dist/
+reactcms-dashboard/dist/
+# SDK dist is committed — the backend serves it at runtime
+# reactcms-sdk/dist/ — NOT ignored
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Docker volumes
+postgres_data/
+redis_data/
+
+# Archives
+*.tar.gz
+*.zip

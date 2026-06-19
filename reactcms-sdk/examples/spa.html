@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>ReactCMS — SPA example</title>
+  <style>
+    body  { font-family: system-ui, sans-serif; max-width: 700px; margin: 3rem auto; padding: 0 1.5rem; }
+    nav   { display: flex; gap: 1rem; margin-bottom: 2rem; }
+    nav a { cursor: pointer; color: #4f46e5; text-decoration: underline; }
+    .rcms-loading { opacity: 0.35; }
+    pre   { background: #f3f4f6; padding: 1rem; border-radius: 8px; font-size: 0.8rem; }
+  </style>
+  <script src="../dist/sdk.js"
+    data-key="cms_pk_your_api_key_here"
+    data-website="a1b2c3d4-e5f6-7890-abcd-ef1234567890">
+  </script>
+</head>
+<body>
+
+  <nav>
+    <a onclick="navigate('home')">Home</a>
+    <a onclick="navigate('about')">About</a>
+    <a onclick="navigate('contact')">Contact</a>
+  </nav>
+
+  <div id="page"></div>
+  <pre id="log"></pre>
+
+  <script>
+    // Page templates — each has data-cms elements with different keys.
+    // The MutationObserver inside the SDK automatically detects and fills
+    // newly added elements without needing another init() call.
+    var pages = {
+      home: '\
+        <h1 data-cms="hero-title">Home</h1>\
+        <p  data-cms="hero-subtitle">Subtitle</p>\
+        <button data-cms="cta-label">CTA</button>',
+
+      about: '\
+        <h1 data-cms="about-title">About us</h1>\
+        <div data-cms="about-body" data-cms-type="html"><p>Loading…</p></div>',
+
+      contact: '\
+        <h1 data-cms="contact-title">Contact</h1>\
+        <p data-cms="contact-email" data-cms-attr="href"\
+           style="display:none" id="mailLink"></p>\
+        <p>Email: <a id="mailLink" data-cms="contact-email">Loading…</a></p>',
+    };
+
+    function log(msg) {
+      document.getElementById('log').textContent += msg + '\n';
+    }
+
+    document.addEventListener('reactcms:ready', function (e) {
+      log('[ready] injected=' + e.detail.injected + ' fromCache=' + e.detail.fromCache);
+    });
+
+    function navigate(page) {
+      log('[nav] → ' + page);
+      // Injecting new HTML — the SDK's MutationObserver picks up [data-cms] elements
+      // in the new markup and fills them automatically from the in-memory cache.
+      document.getElementById('page').innerHTML = pages[page] || '<p>Not found</p>';
+    }
+
+    // Initial page — SDK auto-inited from script tag, so content is already loading.
+    navigate('home');
+
+    // You can also read values in JS:
+    document.addEventListener('reactcms:ready', function () {
+      var title = window.ReactCMS.getValue('hero-title', 'Untitled');
+      log('[js read] hero-title = "' + title + '"');
+    });
+  </script>
+
+</body>
+</html>

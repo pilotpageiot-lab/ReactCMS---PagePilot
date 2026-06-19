@@ -1,0 +1,120 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+	margin: 0;
+	padding: 0;
+}
+
+:root {
+	--color-indigo: #6366f1;
+	--font-sans: "Inter", system-ui, -apple-system, sans-serif;
+	--font-mono: "JetBrains Mono", "Fira Code", monospace;
+}
+
+html {
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+body {
+	font-family: var(--font-sans);
+	font-size: 14px;
+	line-height: 1.5;
+	color: #111827;
+	background: #f9fafb;
+}
+
+code,
+pre,
+.font-mono {
+	font-family: var(--font-mono);
+}
+
+::-webkit-scrollbar {
+	width: 6px;
+	height: 6px;
+}
+::-webkit-scrollbar-track {
+	background: transparent;
+}
+::-webkit-scrollbar-thumb {
+	background: #e5e7eb;
+	border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+	background: #d1d5db;
+}
+
+:focus-visible {
+	outline: 2px solid var(--color-indigo);
+	outline-offset: 2px;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+	transition-property: color, background-color, border-color, opacity;
+	transition-duration: 120ms;
+	transition-timing-function: ease;
+}
+
+.prose h1,
+.prose h2,
+.prose h3 {
+	font-weight: 600;
+	line-height: 1.3;
+}
+.prose h1 {
+	font-size: 1.5rem;
+	margin-bottom: 0.75rem;
+}
+.prose h2 {
+	font-size: 1.25rem;
+	margin-bottom: 0.5rem;
+}
+.prose h3 {
+	font-size: 1.1rem;
+	margin-bottom: 0.4rem;
+}
+.prose p {
+	margin-bottom: 0.75rem;
+	line-height: 1.6;
+}
+.prose ul,
+.prose ol {
+	margin-left: 1.25rem;
+	margin-bottom: 0.75rem;
+}
+.prose a {
+	color: var(--color-indigo);
+	text-decoration: underline;
+}
+.prose strong {
+	font-weight: 600;
+}
+
+@keyframes slide-in {
+	from { transform: translateX(-100%); }
+	to   { transform: translateX(0); }
+}
+.animate-slide-in {
+	animation: slide-in 200ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		transition-duration: 0.01ms !important;
+	}
+}

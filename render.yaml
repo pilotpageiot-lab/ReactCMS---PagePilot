@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: reactcms-api
+    runtime: node
+    plan: free
+    buildCommand: cd reactcms-backend && npm install && npm run build
+    startCommand: cd reactcms-backend && npm run db:migrate:prod && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: API_BASE_URL
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_ACCESS_EXPIRY
+        value: 15m
+      - key: JWT_REFRESH_EXPIRY
+        value: 7d
+      - key: BCRYPT_ROUNDS
+        value: "12"
+      - key: CORS_ORIGINS
+        sync: false
+      - key: RATE_LIMIT_AUTH_MAX
+        value: "5"
+      - key: RATE_LIMIT_API_MAX
+        value: "120"
+      - key: RATE_LIMIT_SDK_MAX
+        value: "500"

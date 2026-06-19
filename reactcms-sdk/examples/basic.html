@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ReactCMS — Basic example</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 4rem auto; padding: 0 1.5rem; color: #111; }
+    h1   { font-size: 2.25rem; font-weight: 700; line-height: 1.2; }
+    .rcms-loading { opacity: 0.4; transition: opacity 0.2s; }
+  </style>
+
+  <!--
+    Drop the SDK in — that's it.
+
+    data-key     = your read-scoped API key (cms_pk_…)
+    data-website = your website UUID from the ReactCMS dashboard
+  -->
+  <script
+    src="../dist/sdk.js"
+    data-key="cms_pk_your_api_key_here"
+    data-website="a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+  ></script>
+</head>
+<body>
+
+  <!-- Text content: data-cms="key" replaces element's textContent -->
+  <h1 data-cms="hero-title">Welcome to our site</h1>
+  <p  data-cms="hero-subtitle">The best place on the web.</p>
+
+  <!-- Button label -->
+  <button data-cms="cta-label">Get started</button>
+
+  <!-- Image: data-cms-attr="src" writes the value to the src attribute -->
+  <img
+    data-cms="hero-image"
+    data-cms-attr="src"
+    src="/placeholder.jpg"
+    alt="Hero"
+    width="800"
+    height="450"
+  />
+
+  <!-- HTML content: data-cms-type="html" renders raw markup -->
+  <div data-cms="about-body" data-cms-type="html">
+    <p>Default content while loading…</p>
+  </div>
+
+  <!-- Explicit fallback when key is not in the CMS -->
+  <footer data-cms="footer-text" data-cms-fallback="© 2026 My Company">
+  </footer>
+
+</body>
+</html>
