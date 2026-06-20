@@ -1,7 +1,7 @@
 import { useState, FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Globe, Plus, Trash2, ExternalLink, MoreHorizontal } from 'lucide-react';
+import { Globe, Plus, Trash2, ExternalLink } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/Button';
@@ -11,7 +11,6 @@ import { Modal } from '@/components/ui/Modal';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { websitesApi } from '@/api/websites';
 import { ApiError } from '@/lib/api-client';
-import type { Website } from '@/types';
 import { clsx } from 'clsx';
 
 const PLAN_VARIANT: Record<string, 'default' | 'indigo' | 'success'> = {

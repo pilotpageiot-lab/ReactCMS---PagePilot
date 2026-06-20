@@ -1,5 +1,5 @@
 import { client } from '@/lib/api-client';
-import type { ContentItem, ContentVersion, PaginatedResponse, ScannedItem, ScanResult, ImportBatchResult } from '@/types';
+import type { ContentItem, ContentVersion, PaginatedResponse, ScanResult, ImportBatchResult } from '@/types';
 
 interface ListContentParams {
   type?: string;

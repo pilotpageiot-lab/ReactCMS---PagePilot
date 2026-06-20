@@ -1,5 +1,4 @@
 import { useState, FormEvent } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';

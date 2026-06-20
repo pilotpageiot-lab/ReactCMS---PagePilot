@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Key, Plus, Trash2, Copy, Check, Eye, EyeOff } from 'lucide-react';
+import { Key, Plus, Trash2, Copy, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { clsx } from 'clsx';
 import { Button } from '@/components/ui/Button';
@@ -10,8 +10,7 @@ import { Modal } from '@/components/ui/Modal';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { apiKeysApi } from '@/api/apikeys';
 import { ApiError } from '@/lib/api-client';
-import { formatRelative, formatDate } from '@/lib/date';
-import type { ApiKey } from '@/types';
+import { formatRelative } from '@/lib/date';
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);

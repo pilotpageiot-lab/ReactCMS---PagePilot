@@ -1,5 +1,5 @@
 import { client } from '@/lib/api-client';
-import type { Website, Member, PaginatedResponse } from '@/types';
+import type { Website, Member } from '@/types';
 
 export const websitesApi = {
   list: (): Promise<{ data: Website[]; total: number }> =>
