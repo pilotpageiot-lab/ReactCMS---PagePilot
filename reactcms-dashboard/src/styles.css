@@ -1,120 +1,532 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap");
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ── Reset ───────────────────────────────────────────────────────────────── */
 *,
 *::before,
 *::after {
-	box-sizing: border-box;
-	margin: 0;
-	padding: 0;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
+/* ── PagePilot design tokens ──────────────────────────────────────────────── */
 :root {
-	--color-indigo: #6366f1;
-	--font-sans: "Inter", system-ui, -apple-system, sans-serif;
-	--font-mono: "JetBrains Mono", "Fira Code", monospace;
+  /* Brand */
+  --color-bg:        #0b1220;
+  --color-card:      #111c2e;
+  --color-border:    #1e293b;
+  --color-green:     #22c55e;
+  --color-green-dim: #16a34a;
+
+  /* Text */
+  --color-text:      #e2e8f0;
+  --color-muted:     #94a3b8;
+  --color-subtle:    #64748b;
+
+  /* Misc */
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", monospace;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
 }
 
+/* ── Base ─────────────────────────────────────────────────────────────────── */
 html {
-	-webkit-font-smoothing: antialiased;
-	-moz-osx-font-smoothing: grayscale;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
-	font-family: var(--font-sans);
-	font-size: 14px;
-	line-height: 1.5;
-	color: #111827;
-	background: #f9fafb;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-text);
+  background: var(--color-bg);
 }
 
 code,
 pre,
 .font-mono {
-	font-family: var(--font-mono);
+  font-family: var(--font-mono);
 }
 
-::-webkit-scrollbar {
-	width: 6px;
-	height: 6px;
-}
-::-webkit-scrollbar-track {
-	background: transparent;
-}
-::-webkit-scrollbar-thumb {
-	background: #e5e7eb;
-	border-radius: 999px;
-}
-::-webkit-scrollbar-thumb:hover {
-	background: #d1d5db;
-}
+/* ── Scrollbars ───────────────────────────────────────────────────────────── */
+::-webkit-scrollbar        { width: 5px; height: 5px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: var(--color-border); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: #334155; }
 
+/* ── Focus ────────────────────────────────────────────────────────────────── */
 :focus-visible {
-	outline: 2px solid var(--color-indigo);
-	outline-offset: 2px;
+  outline: 2px solid var(--color-green);
+  outline-offset: 2px;
 }
 
+/* ── Transition defaults ──────────────────────────────────────────────────── */
 button,
 a,
 input,
 select,
 textarea {
-	transition-property: color, background-color, border-color, opacity;
-	transition-duration: 120ms;
-	transition-timing-function: ease;
+  transition-property: color, background-color, border-color, opacity, box-shadow;
+  transition-duration: 120ms;
+  transition-timing-function: ease;
 }
 
-.prose h1,
-.prose h2,
-.prose h3 {
-	font-weight: 600;
-	line-height: 1.3;
-}
-.prose h1 {
-	font-size: 1.5rem;
-	margin-bottom: 0.75rem;
-}
-.prose h2 {
-	font-size: 1.25rem;
-	margin-bottom: 0.5rem;
-}
-.prose h3 {
-	font-size: 1.1rem;
-	margin-bottom: 0.4rem;
-}
-.prose p {
-	margin-bottom: 0.75rem;
-	line-height: 1.6;
-}
-.prose ul,
-.prose ol {
-	margin-left: 1.25rem;
-	margin-bottom: 0.75rem;
-}
-.prose a {
-	color: var(--color-indigo);
-	text-decoration: underline;
-}
-.prose strong {
-	font-weight: 600;
+/* ─────────────────────────────────────────────────────────────────────────────
+   COMPONENT OVERRIDES
+   These patch the Tailwind utility classes the dashboard already uses,
+   pulling them into the PagePilot dark palette without touching any .tsx files.
+───────────────────────────────────────────────────────────────────────────── */
+
+/* ── Page / App shell ─────────────────────────────────────────────────────── */
+.flex.h-screen,
+.min-h-screen {
+  background: var(--color-bg);
 }
 
+/* ── Sidebar ──────────────────────────────────────────────────────────────── */
+aside {
+  background: var(--color-card) !important;
+  border-color: var(--color-border) !important;
+}
+
+/* Logo mark */
+aside .w-7.h-7,
+aside .w-9.h-9 {
+  background: var(--color-green) !important;
+}
+
+/* Sidebar active nav item */
+aside a[aria-current="page"],
+aside a.bg-indigo-50 {
+  background: rgba(34, 197, 94, 0.12) !important;
+  color: var(--color-green) !important;
+}
+
+/* Sidebar inactive nav items */
+aside a {
+  color: var(--color-muted) !important;
+}
+aside a:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: var(--color-text) !important;
+}
+
+/* User avatar initials */
+aside .bg-indigo-100 {
+  background: rgba(34, 197, 94, 0.15) !important;
+}
+aside .text-indigo-700 {
+  color: var(--color-green) !important;
+}
+
+/* Logout / sign-out button in sidebar */
+aside button {
+  color: var(--color-muted) !important;
+}
+aside button:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: var(--color-text) !important;
+}
+
+/* ── Mobile top bar ───────────────────────────────────────────────────────── */
+.md\:hidden.flex.items-center {
+  background: var(--color-card) !important;
+  border-color: var(--color-border) !important;
+}
+
+/* ── Cards / white surfaces ───────────────────────────────────────────────── */
+.bg-white {
+  background: var(--color-card) !important;
+}
+.bg-gray-50 {
+  background: var(--color-bg) !important;
+}
+
+/* ── Borders ──────────────────────────────────────────────────────────────── */
+.border-gray-100,
+.border-gray-200 {
+  border-color: var(--color-border) !important;
+}
+.divide-gray-100 > * + * {
+  border-color: var(--color-border) !important;
+}
+.divide-y > * + * {
+  border-color: var(--color-border) !important;
+}
+
+/* ── Text ─────────────────────────────────────────────────────────────────── */
+.text-gray-900  { color: var(--color-text) !important; }
+.text-gray-800  { color: #cbd5e1 !important; }
+.text-gray-700  { color: var(--color-muted) !important; }
+.text-gray-600  { color: var(--color-muted) !important; }
+.text-gray-500  { color: var(--color-subtle) !important; }
+.text-gray-400  { color: #475569 !important; }
+
+/* ── Buttons — Primary (green) ────────────────────────────────────────────── */
+.bg-indigo-600 {
+  background: var(--color-green) !important;
+  color: #0b1220 !important;
+  font-weight: 600 !important;
+}
+.bg-indigo-600:hover,
+.hover\:bg-indigo-500:hover {
+  background: var(--color-green-dim) !important;
+}
+.text-white {
+  color: #0b1220 !important;
+}
+
+/* ── Buttons — Secondary / Ghost ─────────────────────────────────────────── */
+.bg-white.border.border-gray-200,
+button.border.border-gray-200 {
+  background: transparent !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-text) !important;
+}
+button.border.border-gray-200:hover,
+.hover\:bg-gray-50:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
+.hover\:bg-gray-100:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* ── Danger button ────────────────────────────────────────────────────────── */
+.bg-red-600 {
+  background: #ef4444 !important;
+  color: #fff !important;
+}
+.bg-red-600:hover,
+.hover\:bg-red-500:hover {
+  background: #dc2626 !important;
+}
+
+/* ── Inputs ───────────────────────────────────────────────────────────────── */
+input,
+textarea,
+select {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-text) !important;
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--color-subtle) !important;
+}
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--color-green) !important;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2) !important;
+  background: rgba(255, 255, 255, 0.07) !important;
+}
+input:hover,
+textarea:hover,
+select:hover {
+  border-color: #334155 !important;
+}
+
+/* ── Badges ───────────────────────────────────────────────────────────────── */
+.bg-gray-100.text-gray-600 {
+  background: rgba(255, 255, 255, 0.07) !important;
+  color: var(--color-muted) !important;
+}
+.bg-emerald-50.text-emerald-700 {
+  background: rgba(34, 197, 94, 0.12) !important;
+  color: var(--color-green) !important;
+}
+.bg-amber-50.text-amber-700 {
+  background: rgba(245, 158, 11, 0.12) !important;
+  color: #f59e0b !important;
+}
+.bg-red-50.text-red-600 {
+  background: rgba(239, 68, 68, 0.12) !important;
+  color: #f87171 !important;
+}
+.bg-indigo-50.text-indigo-700 {
+  background: rgba(34, 197, 94, 0.12) !important;
+  color: var(--color-green) !important;
+}
+
+/* ── Tables ───────────────────────────────────────────────────────────────── */
+thead tr {
+  background: var(--color-bg) !important;
+}
+tbody tr:hover {
+  background: rgba(255, 255, 255, 0.03) !important;
+}
+.text-xs.font-semibold.text-gray-500.uppercase {
+  color: var(--color-subtle) !important;
+  letter-spacing: 0.06em;
+}
+
+/* ── Modals ───────────────────────────────────────────────────────────────── */
+[role="dialog"] {
+  background: var(--color-card) !important;
+  border: 1px solid var(--color-border);
+}
+
+/* ── Tabs (website detail) ────────────────────────────────────────────────── */
+.border-indigo-600 {
+  border-color: var(--color-green) !important;
+}
+.text-indigo-700 {
+  color: var(--color-green) !important;
+}
+button.text-indigo-700.border-indigo-600 {
+  color: var(--color-green) !important;
+  border-color: var(--color-green) !important;
+}
+
+/* ── Active nav link (react-router NavLink) ───────────────────────────────── */
+.bg-indigo-50 {
+  background: rgba(34, 197, 94, 0.1) !important;
+}
+
+/* ── Links ────────────────────────────────────────────────────────────────── */
+a.text-indigo-600,
+.text-indigo-600 {
+  color: var(--color-green) !important;
+}
+a.text-indigo-600:hover,
+.hover\:text-indigo-700:hover,
+.hover\:text-indigo-800:hover {
+  color: var(--color-green-dim) !important;
+}
+
+/* ── Icons / action buttons ───────────────────────────────────────────────── */
+.hover\:text-red-500:hover  { color: #f87171 !important; }
+.hover\:text-red-600:hover  { color: #ef4444 !important; }
+.hover\:bg-red-50:hover     { background: rgba(239, 68, 68, 0.1) !important; }
+.text-emerald-500           { color: var(--color-green) !important; }
+.text-emerald-600           { color: var(--color-green) !important; }
+.text-amber-500             { color: #f59e0b !important; }
+
+/* ── Status dots on website list ─────────────────────────────────────────── */
+.bg-emerald-400 { background: var(--color-green) !important; }
+
+/* ── Login page ───────────────────────────────────────────────────────────── */
+.min-h-screen.bg-gray-50.flex {
+  background: var(--color-bg) !important;
+}
+.rounded-2xl.border.border-gray-200.shadow-sm {
+  background: var(--color-card) !important;
+  border-color: var(--color-border) !important;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Login tab active state */
+.border-b-2.border-indigo-600 {
+  border-color: var(--color-green) !important;
+  color: var(--color-text) !important;
+}
+
+/* Login logo mark */
+.w-9.h-9.rounded-xl.bg-indigo-600 {
+  background: var(--color-green) !important;
+}
+
+/* Login brand text */
+.text-xl.font-semibold.text-gray-900 {
+  color: var(--color-text) !important;
+}
+
+/* Login error box */
+.bg-red-50.rounded-lg.text-red-700 {
+  background: rgba(239, 68, 68, 0.12) !important;
+  color: #f87171 !important;
+}
+
+/* ── Content editor ───────────────────────────────────────────────────────── */
+/* Editor toolbar */
+.px-4.py-2\.5.border-b.border-gray-100.bg-white {
+  background: var(--color-card) !important;
+  border-color: var(--color-border) !important;
+}
+
+/* Unsaved indicator */
+.bg-amber-400 { background: #f59e0b !important; }
+.bg-gray-200  { background: var(--color-border) !important; }
+
+/* Content type select */
+.h-7.rounded-md.border.border-gray-200.bg-white {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-muted) !important;
+}
+
+/* History/filter toggle buttons */
+.bg-gray-100.text-gray-900 {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: var(--color-text) !important;
+}
+
+/* Left content list sidebar */
+.bg-gray-50.border-l-indigo-600 {
+  background: rgba(34, 197, 94, 0.06) !important;
+}
+.border-l-indigo-600 {
+  border-color: var(--color-green) !important;
+}
+
+/* Content row selected */
+.bg-indigo-50.border-l-indigo-600 {
+  background: rgba(34, 197, 94, 0.08) !important;
+}
+.text-indigo-700.font-mono {
+  color: var(--color-green) !important;
+}
+.text-indigo-500 {
+  color: var(--color-green) !important;
+}
+
+/* Filter type pills */
+.bg-indigo-100.text-indigo-700 {
+  background: rgba(34, 197, 94, 0.15) !important;
+  color: var(--color-green) !important;
+}
+
+/* Live preview area */
+.bg-gray-900.text-emerald-400 {
+  background: #0b1220 !important;
+  border: 1px solid var(--color-border);
+  color: var(--color-green) !important;
+}
+
+/* Version history */
+.bg-indigo-50.text-indigo-600 {
+  background: rgba(34, 197, 94, 0.12) !important;
+  color: var(--color-green) !important;
+}
+
+/* ── API keys ─────────────────────────────────────────────────────────────── */
+/* New key banner */
+.bg-emerald-50.border-emerald-200 {
+  background: rgba(34, 197, 94, 0.08) !important;
+  border-color: rgba(34, 197, 94, 0.25) !important;
+}
+.text-emerald-800 { color: var(--color-green) !important; }
+.border-emerald-200.bg-white { 
+  background: rgba(255, 255, 255, 0.05) !important; 
+  border-color: rgba(34, 197, 94, 0.2) !important; 
+}
+.text-emerald-600 { color: var(--color-green) !important; }
+
+/* Scope selector */
+.bg-indigo-50.border-indigo-300.text-indigo-700 {
+  background: rgba(34, 197, 94, 0.12) !important;
+  border-color: rgba(34, 197, 94, 0.4) !important;
+  color: var(--color-green) !important;
+}
+
+/* ── Members / roles ──────────────────────────────────────────────────────── */
+.bg-indigo-100.text-indigo-700.text-xs.font-semibold {
+  background: rgba(34, 197, 94, 0.12) !important;
+  color: var(--color-green) !important;
+}
+
+/* ── Scan modal ───────────────────────────────────────────────────────────── */
+.bg-indigo-50\/50 {
+  background: rgba(34, 197, 94, 0.05) !important;
+}
+.border-indigo-300 {
+  border-color: rgba(34, 197, 94, 0.35) !important;
+}
+
+/* ── Code blocks ──────────────────────────────────────────────────────────── */
+code,
+.font-mono.bg-gray-100 {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: var(--color-green) !important;
+  border-radius: 4px;
+  padding: 1px 4px;
+}
+
+/* ── Toast notifications ──────────────────────────────────────────────────── */
+/* react-hot-toast: dark background */
+[data-hot-toast] > div {
+  background: var(--color-card) !important;
+  color: var(--color-text) !important;
+  border: 1px solid var(--color-border) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6) !important;
+}
+
+/* ── Empty state icon container ───────────────────────────────────────────── */
+.w-12.h-12.rounded-xl.bg-gray-100 {
+  background: rgba(255, 255, 255, 0.07) !important;
+}
+
+/* ── Dashboard stat cards ─────────────────────────────────────────────────── */
+.bg-white.rounded-xl.border.border-gray-200 {
+  background: var(--color-card) !important;
+  border-color: var(--color-border) !important;
+}
+
+/* Globe icon in website list */
+.bg-indigo-50.flex.items-center.justify-center .text-indigo-600 {
+  color: var(--color-green) !important;
+}
+.w-8.h-8.rounded-lg.bg-indigo-50 {
+  background: rgba(34, 197, 94, 0.1) !important;
+}
+
+/* ── Settings page ────────────────────────────────────────────────────────── */
+.bg-gray-50.rounded-xl.border {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border-color: var(--color-border) !important;
+}
+
+/* Danger zone border */
+.border-red-200 {
+  border-color: rgba(239, 68, 68, 0.25) !important;
+}
+
+/* ── Prose (rich text preview) ────────────────────────────────────────────── */
+.prose h1, .prose h2, .prose h3 { font-weight: 600; line-height: 1.3; color: var(--color-text); }
+.prose h1 { font-size: 1.5rem; margin-bottom: 0.75rem; }
+.prose h2 { font-size: 1.25rem; margin-bottom: 0.5rem; }
+.prose h3 { font-size: 1.1rem; margin-bottom: 0.4rem; }
+.prose p  { margin-bottom: 0.75rem; line-height: 1.6; color: var(--color-muted); }
+.prose ul, .prose ol { margin-left: 1.25rem; margin-bottom: 0.75rem; color: var(--color-muted); }
+.prose a  { color: var(--color-green); text-decoration: underline; }
+.prose strong { font-weight: 600; color: var(--color-text); }
+
+/* ── Animations ───────────────────────────────────────────────────────────── */
 @keyframes slide-in {
-	from { transform: translateX(-100%); }
-	to   { transform: translateX(0); }
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
 }
-.animate-slide-in {
-	animation: slide-in 200ms ease-out;
+.animate-slide-in { animation: slide-in 200ms ease-out; }
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+  50%       { box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.15); }
 }
 
+/* Subtle green glow on primary buttons */
+.bg-indigo-600:not(:disabled):focus-visible {
+  animation: pulse-glow 1.5s ease infinite;
+}
+
+
+/* ── Checkbox ─────────────────────────────────────────────────────────────── */
+input[type="checkbox"] {
+  accent-color: var(--color-green);
+}
+
+/* ── Reduced motion ───────────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
-	*,
-	*::before,
-	*::after {
-		animation-duration: 0.01ms !important;
-		transition-duration: 0.01ms !important;
-	}
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
