@@ -105,6 +105,43 @@ export async function inviteMember(websiteId: string, dto: InviteMemberDto) {
   return { invited: true, email: dto.email, role: dto.role, invited_at: rows[0].invited_at };
 }
 
+export async function listPendingInvites(userId: string) {
+  const { rows } = await pool.query(
+    `SELECT wm.id AS invite_id, wm.role, wm.invited_at,
+            w.id AS website_id, w.name AS website_name, w.slug,
+            u.name AS invited_by_name, u.email AS invited_by_email
+     FROM website_members wm
+     JOIN websites w ON w.id = wm.website_id
+     JOIN users u ON u.id = w.owner_id
+     WHERE wm.user_id = $1 AND wm.accepted_at IS NULL
+     ORDER BY wm.invited_at DESC`,
+    [userId],
+  );
+  return { data: rows };
+}
+
+export async function acceptInvite(userId: string, websiteId: string) {
+  const { rows } = await pool.query(
+    `UPDATE website_members
+     SET accepted_at = now()
+     WHERE website_id = $1 AND user_id = $2 AND accepted_at IS NULL
+     RETURNING *`,
+    [websiteId, userId],
+  );
+  if (rows.length === 0) throw new NotFoundError('Pending invite');
+  return rows[0];
+}
+
+export async function declineInvite(userId: string, websiteId: string) {
+  const { rows } = await pool.query(
+    `DELETE FROM website_members
+     WHERE website_id = $1 AND user_id = $2 AND accepted_at IS NULL
+     RETURNING id`,
+    [websiteId, userId],
+  );
+  if (rows.length === 0) throw new NotFoundError('Pending invite');
+}
+
 export async function removeMember(
   websiteId: string,
   targetUserId: string,

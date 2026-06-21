@@ -1,5 +1,5 @@
 import { client } from '@/lib/api-client';
-import type { Website, Member } from '@/types';
+import type { Website, Member, PendingInvite } from '@/types';
 
 export const websitesApi = {
   list: (): Promise<{ data: Website[]; total: number }> =>
@@ -32,4 +32,14 @@ export const websitesApi = {
 
   removeMember: (websiteId: string, userId: string): Promise<void> =>
     client.delete(`/v1/websites/${websiteId}/members/${userId}`),
+
+  // Invites
+  listPendingInvites: (): Promise<{ data: PendingInvite[] }> =>
+    client.get('/v1/websites/invites/pending'),
+
+  acceptInvite: (websiteId: string): Promise<unknown> =>
+    client.post(`/v1/websites/invites/${websiteId}/accept`, {}),
+
+  declineInvite: (websiteId: string): Promise<void> =>
+    client.post(`/v1/websites/invites/${websiteId}/decline`, {}),
 };

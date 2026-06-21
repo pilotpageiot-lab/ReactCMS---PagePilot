@@ -61,6 +61,17 @@ export interface Member {
   accepted_at: string | null;
 }
 
+export interface PendingInvite {
+  invite_id: string;
+  role: 'admin' | 'editor' | 'viewer';
+  invited_at: string;
+  website_id: string;
+  website_name: string;
+  slug: string;
+  invited_by_name: string;
+  invited_by_email: string;
+}
+
 export interface PaginatedResponse<T> {
   data: T[];
   total: number;

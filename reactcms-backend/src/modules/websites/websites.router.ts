@@ -65,6 +65,27 @@ router.delete(
   },
 );
 
+// ── Invites (for the logged-in user) ──────────────────────────────────────────
+
+router.get('/invites/pending', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    ok(res, await websitesService.listPendingInvites(req.user!.id));
+  } catch (err) { next(err); }
+});
+
+router.post('/invites/:websiteId/accept', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    ok(res, await websitesService.acceptInvite(req.user!.id, req.params['websiteId']!));
+  } catch (err) { next(err); }
+});
+
+router.post('/invites/:websiteId/decline', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await websitesService.declineInvite(req.user!.id, req.params['websiteId']!);
+    noContent(res);
+  } catch (err) { next(err); }
+});
+
 // ── Members ────────────────────────────────────────────
 
 router.get(

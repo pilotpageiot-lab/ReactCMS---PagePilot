@@ -1,7 +1,7 @@
 import { useState, FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Globe, Plus, Trash2, ExternalLink } from 'lucide-react';
+import { Globe, Plus, Trash2, ExternalLink, Mail, Check, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/Button';
@@ -11,7 +11,9 @@ import { Modal } from '@/components/ui/Modal';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { websitesApi } from '@/api/websites';
 import { ApiError } from '@/lib/api-client';
+import { formatRelative } from '@/lib/date';
 import { clsx } from 'clsx';
+import type { PendingInvite } from '@/types';
 
 const PLAN_VARIANT: Record<string, 'default' | 'indigo' | 'success'> = {
   free: 'default',
@@ -93,7 +95,8 @@ export function WebsiteListPage() {
         }
       />
 
-      <div className="px-6 pb-6">
+      <div className="px-6 pb-6 space-y-4">
+        <PendingInvites />
         {isLoading ? (
           <div className="space-y-2">
             {[1, 2, 3].map((i) => (
@@ -286,5 +289,84 @@ function CreateWebsiteModal({
         </div>
       </form>
     </Modal>
+  );
+}
+
+// ── Pending invites banner ──────────────────────────────────────────────────
+
+function PendingInvites() {
+  const queryClient = useQueryClient();
+
+  const { data } = useQuery({
+    queryKey: ['invites-pending'],
+    queryFn: () => websitesApi.listPendingInvites(),
+  });
+
+  const acceptMutation = useMutation({
+    mutationFn: (websiteId: string) => websitesApi.acceptInvite(websiteId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invites-pending'] });
+      queryClient.invalidateQueries({ queryKey: ['websites'] });
+      toast.success('Invite accepted');
+    },
+    onError: () => toast.error('Failed to accept invite'),
+  });
+
+  const declineMutation = useMutation({
+    mutationFn: (websiteId: string) => websitesApi.declineInvite(websiteId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invites-pending'] });
+      toast.success('Invite declined');
+    },
+    onError: () => toast.error('Failed to decline invite'),
+  });
+
+  const invites: PendingInvite[] = data?.data ?? [];
+  if (invites.length === 0) return null;
+
+  return (
+    <div className="bg-indigo-50 border border-indigo-200 rounded-xl overflow-hidden">
+      <div className="px-4 py-3 flex items-center gap-2 border-b border-indigo-100">
+        <Mail size={14} className="text-indigo-600" />
+        <span className="text-sm font-semibold text-indigo-900">
+          Pending invite{invites.length !== 1 ? 's' : ''}
+        </span>
+        <Badge variant="indigo">{invites.length}</Badge>
+      </div>
+      <div className="divide-y divide-indigo-100">
+        {invites.map((inv) => (
+          <div key={inv.invite_id} className="flex items-start sm:items-center gap-3 px-4 py-3">
+            <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center shrink-0">
+              <Globe size={14} className="text-indigo-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-900">{inv.website_name}</p>
+              <p className="text-xs text-gray-500">
+                Invited by {inv.invited_by_name} as <span className="capitalize font-medium">{inv.role}</span>
+                {' · '}{formatRelative(inv.invited_at)}
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                onClick={() => acceptMutation.mutate(inv.website_id)}
+                disabled={acceptMutation.isPending || declineMutation.isPending}
+                className="p-1.5 text-emerald-600 hover:bg-emerald-100 rounded-md transition-colors"
+                title="Accept"
+              >
+                <Check size={16} />
+              </button>
+              <button
+                onClick={() => declineMutation.mutate(inv.website_id)}
+                disabled={acceptMutation.isPending || declineMutation.isPending}
+                className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
+                title="Decline"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
