@@ -1,5 +1,6 @@
 import * as cheerio from 'cheerio';
 import type { AnyNode } from 'domhandler';
+import { AppError } from '../../utils/errors';
 
 export interface DiscoveredItem {
   key: string;
@@ -83,13 +84,19 @@ function buildContext($: cheerio.CheerioAPI, el: AnyNode): string {
 }
 
 export async function fetchAndScanHtml(url: string): Promise<DiscoveredItem[]> {
-  const res = await fetch(url, {
-    headers: { 'User-Agent': 'ReactCMS-Scanner/1.0' },
-    signal: AbortSignal.timeout(15_000),
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: { 'User-Agent': 'ReactCMS-Scanner/1.0' },
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new AppError(`Unable to reach ${url}: ${message}`, 422, 'SCAN_FETCH_FAILED');
+  }
 
   if (!res.ok) {
-    throw new Error(`Failed to fetch ${url}: HTTP ${res.status}`);
+    throw new AppError(`Failed to fetch ${url}: HTTP ${res.status}`, 422, 'SCAN_FETCH_FAILED');
   }
 
   const html = await res.text();
