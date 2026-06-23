@@ -4,7 +4,7 @@ import {
   signAccessToken, signRefreshToken, verifyRefreshToken, expiryToSeconds,
 } from '../../lib/jwt';
 import {
-  storeRefreshToken, validateRefreshToken, revokeRefreshToken,
+  storeRefreshToken, validateRefreshToken, revokeRefreshToken, revokeAllUserTokens,
 } from '../../lib/redis';
 import { redis } from '../../lib/redis';
 import { hashPassword, verifyPassword } from '../../utils/hash';
@@ -116,6 +116,15 @@ export async function getMe(userId: string) {
   return userResponse(user);
 }
 
+export async function updateProfile(userId: string, name: string) {
+  const { rows } = await pool.query<UserRow>(
+    'UPDATE users SET name = $1, updated_at = now() WHERE id = $2 RETURNING id, email, name, role, email_verified_at, created_at',
+    [name, userId],
+  );
+  if (!rows[0]) throw new NotFoundError('User');
+  return userResponse(rows[0]);
+}
+
 export async function verifyEmail(token: string) {
   const userId = await redis.get(VERIFY_TOKEN_PREFIX + token);
   if (!userId) throw new BadRequestError('Invalid or expired verification link');
@@ -154,6 +163,7 @@ export async function changePassword(email: string, oldPassword: string, newPass
   if (!valid) throw new UnauthorizedError('Invalid credentials');
   const newHash = await hashPassword(newPassword);
   await pool.query('UPDATE users SET password_hash = $1, updated_at = now() WHERE id = $2', [newHash, user.id]);
+  await revokeAllUserTokens(user.id);
 }
 
 export async function changePasswordAuth(userId: string, oldPassword: string, newPassword: string) {
@@ -166,6 +176,7 @@ export async function changePasswordAuth(userId: string, oldPassword: string, ne
   if (!valid) throw new UnauthorizedError('Current password is incorrect');
   const newHash = await hashPassword(newPassword);
   await pool.query('UPDATE users SET password_hash = $1, updated_at = now() WHERE id = $2', [newHash, user.id]);
+  await revokeAllUserTokens(userId);
 }
 
 export async function getPlanUsage(userId: string) {

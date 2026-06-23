@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { validate } from '../../middleware/validate.middleware';
 import { requireAuth } from '../../middleware/auth.middleware';
 import { authRateLimit, refreshRateLimit } from '../../middleware/rateLimit.middleware';
-import { registerSchema, loginSchema, changePasswordSchema, updatePasswordSchema } from './auth.schema';
+import { registerSchema, loginSchema, changePasswordSchema, updatePasswordSchema, updateProfileSchema } from './auth.schema';
 import * as authService from './auth.service';
 import { ok, created, noContent } from '../../utils/response';
 
@@ -74,6 +74,19 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const user = await authService.getMe(req.user!.id);
+      ok(res, user);
+    } catch (err) { next(err); }
+  },
+);
+
+// Update profile (name)
+router.patch(
+  '/profile',
+  requireAuth,
+  validate({ body: updateProfileSchema }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const user = await authService.updateProfile(req.user!.id, req.body.name);
       ok(res, user);
     } catch (err) { next(err); }
   },

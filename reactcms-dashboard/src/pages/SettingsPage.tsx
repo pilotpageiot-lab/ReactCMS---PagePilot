@@ -23,8 +23,8 @@ export function SettingsPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      const updated = await authApi.me();
-      setUser({ ...updated, name });
+      const updated = await authApi.updateProfile(name);
+      setUser(updated);
       toast.success('Profile updated');
     } catch {
       toast.error('Failed to save');

@@ -7,7 +7,8 @@
   "types": "src/index.ts",
   "files": ["dist/", "src/"],
   "scripts": {
-    "build": "tsc --project tsconfig.build.json && node scripts/bundle.js",
+    "build": "node scripts/bundle.js",
+    "build:ts": "tsc --project tsconfig.build.json",
     "dev": "tsc --watch",
     "test:node": "node --experimental-vm-modules test/sdk.test.js",
     "lint": "eslint src --ext .ts"

@@ -19,6 +19,14 @@ export async function listWebsites(userId: string) {
 }
 
 export async function createWebsite(userId: string, dto: CreateWebsiteDto) {
+  // Block unverified email users
+  const { rows: userRows } = await pool.query<{ email_verified_at: Date | null }>(
+    'SELECT email_verified_at FROM users WHERE id = $1', [userId],
+  );
+  if (!userRows[0]?.email_verified_at) {
+    throw new ForbiddenError('Please verify your email address before creating a website.');
+  }
+
   const plan = dto.plan ?? 'free';
   const limits = getPlanLimits(plan);
 

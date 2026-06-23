@@ -26,6 +26,9 @@ export const authApi = {
 
   me: (): Promise<User> => client.get<User>('/v1/auth/me'),
 
+  updateProfile: (name: string): Promise<User> =>
+    client.patch<User>('/v1/auth/profile', { name }),
+
   changePassword: (email: string, oldPassword: string, newPassword: string): Promise<{ message: string }> =>
     client.post('/v1/auth/change-password', { email, old_password: oldPassword, new_password: newPassword }),
 
