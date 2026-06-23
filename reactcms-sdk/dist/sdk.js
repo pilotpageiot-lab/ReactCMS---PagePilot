@@ -774,11 +774,13 @@
     _showToolbar: function (el) {
       if (this._toolbar) this._hideToolbar();
 
+      var key = el.getAttribute(A_KEY) || '';
       var bar = document.createElement('div');
       bar.id = 'pp-toolbar';
       bar.innerHTML =
-        '<button id="pp-save" style="background:#22c55e;color:#fff;border:none;padding:5px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:system-ui,sans-serif;">Save</button>' +
-        '<button id="pp-cancel" style="background:#334155;color:#cbd5e1;border:none;padding:5px 14px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;margin-left:6px;font-family:system-ui,sans-serif;">Cancel</button>';
+        '<span id="pp-key" style="font-size:10px;font-family:monospace;color:#22c55e;background:rgba(34,197,94,0.1);padding:3px 8px;border-radius:5px;border:1px solid rgba(34,197,94,0.25);margin-right:8px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + key + '</span>' +
+        '<button id="pp-save" style="background:#22c55e;color:#0b1220;border:none;padding:5px 16px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:system-ui,sans-serif;letter-spacing:0.02em;">Save</button>' +
+        '<button id="pp-cancel" style="background:rgba(255,255,255,0.06);color:#94a3b8;border:1px solid rgba(255,255,255,0.1);padding:5px 14px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;margin-left:6px;font-family:system-ui,sans-serif;">Cancel</button>';
       document.body.appendChild(bar);
       this._toolbar = bar;
 
@@ -820,12 +822,14 @@
       s.id = 'pp-styles';
       s.textContent =
         '[data-cms] { cursor: pointer !important; transition: outline 0.15s ease, box-shadow 0.15s ease; }' +
-        '[data-cms].pp-hover { outline: 2px dashed #22c55e; outline-offset: 3px; }' +
+        '[data-cms].pp-hover { outline: 2px dashed #22c55e; outline-offset: 3px; position:relative; }' +
+        '[data-cms].pp-hover::after { content:attr(data-cms); position:absolute; top:-20px; left:0; font-size:9px; font-family:monospace; color:#22c55e; background:#0b1220; padding:1px 6px; border-radius:3px; border:1px solid rgba(34,197,94,0.3); pointer-events:none; white-space:nowrap; z-index:2147483646; }' +
         '[data-cms].pp-editing { outline: 2px solid #22c55e; outline-offset: 3px; box-shadow: 0 0 0 4px rgba(34,197,94,0.15); cursor: text !important; }' +
+        '[data-cms].pp-editing::after { display:none; }' +
         '[data-cms].pp-saved { animation: pp-flash 0.8s ease; }' +
         '@keyframes pp-flash { 0%{background:rgba(34,197,94,0.2)} 100%{background:transparent} }' +
-        '#pp-toolbar { display:flex; align-items:center; padding:4px; background:#1e293b; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,0.4); }' +
-        '#pp-toolbar button:hover { opacity:0.85; }';
+        '#pp-toolbar { display:flex; align-items:center; padding:6px 8px; background:#0b1220; border:1px solid #1e293b; border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,0.6); }' +
+        '#pp-toolbar button:hover { filter:brightness(1.1); }';
       document.head.appendChild(s);
       this._styleEl = s;
     }
