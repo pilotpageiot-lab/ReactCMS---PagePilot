@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PagePilot — Edit your website instantly. No developer needed.</title>
+<meta name="description" content="PagePilot lets small businesses update their website content in seconds — no developer, no CMS, no technical knowledge required." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --green: #22C55E;
+    --green-dim: #16A34A;
+    --bg: #0B1220;
+    --card: #111C2E;
+    --border: #1E293B;
+    --text: #E2E8F0;
+    --muted: #94A3B8;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* NAV */
+  nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 48px;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: rgba(11,18,32,0.92);
+    backdrop-filter: blur(12px);
+    z-index: 100;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    font-size: 18px;
+    color: var(--text);
+    text-decoration: none;
+  }
+
+  .logo-icon {
+    width: 32px; height: 32px;
+    background: var(--green);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+
+  nav ul { list-style: none; display: flex; gap: 32px; }
+
+  nav ul a {
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 14px; font-weight: 500;
+    transition: color 0.15s;
+  }
+  nav ul a:hover { color: var(--text); }
+
+  .nav-cta {
+    background: var(--green) !important;
+    color: #fff !important;
+    padding: 9px 20px;
+    border-radius: 8px;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    transition: background 0.15s !important;
+  }
+  .nav-cta:hover { background: var(--green-dim) !important; }
+
+  /* HERO */
+  .hero {
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 96px 24px 80px;
+    text-align: center;
+  }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(34,197,94,0.12);
+    color: var(--green);
+    border: 1px solid rgba(34,197,94,0.25);
+    border-radius: 100px;
+    padding: 5px 14px;
+    font-size: 13px; font-weight: 600;
+    margin-bottom: 28px;
+  }
+
+  .badge-dot {
+    width: 6px; height: 6px;
+    background: var(--green);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  h1 {
+    font-size: clamp(40px, 6vw, 62px);
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    margin-bottom: 20px;
+  }
+
+  h1 em { font-style: normal; color: var(--green); }
+
+  .hero-sub {
+    font-size: 18px;
+    color: var(--muted);
+    max-width: 520px;
+    margin: 0 auto 40px;
+    line-height: 1.65;
+  }
+
+  .hero-buttons {
+    display: flex; gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .btn-primary {
+    background: var(--green); color: #fff;
+    border: none;
+    padding: 14px 28px;
+    border-radius: 8px;
+    font-size: 15px; font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    text-decoration: none;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .btn-primary:hover { background: var(--green-dim); transform: translateY(-1px); }
+
+  .btn-secondary {
+    background: transparent; color: var(--text);
+    border: 1px solid var(--border);
+    padding: 14px 28px;
+    border-radius: 8px;
+    font-size: 15px; font-weight: 600;
+    cursor: pointer;
+    transition: border-color 0.15s, transform 0.1s;
+    text-decoration: none;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .btn-secondary:hover { border-color: var(--muted); transform: translateY(-1px); }
+
+  .hero-note { margin-top: 16px; font-size: 13px; color: var(--muted); }
+
+  /* SHARED SECTION LABELS */
+  .section-label {
+    text-align: center;
+    font-size: 12px; font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--green);
+    margin-bottom: 12px;
+  }
+
+  .section-title {
+    text-align: center;
+    font-size: clamp(26px, 4vw, 38px);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 12px;
+  }
+
+  .section-sub {
+    text-align: center;
+    color: var(--muted);
+    max-width: 480px;
+    margin: 0 auto 48px;
+    font-size: 16px;
+  }
+
+  /* DEMO */
+  .demo-wrap {
+    max-width: 900px;
+    margin: 0 auto 96px;
+    padding: 0 24px;
+  }
+
+  .demo-browser {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+  }
+
+  .browser-bar {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 16px;
+    background: #0d1829;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .browser-dots { display: flex; gap: 6px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .dot-r { background: #FF5F57; }
+  .dot-y { background: #FEBC2E; }
+  .dot-g { background: #28C840; }
+
+  .browser-url {
+    flex: 1;
+    background: #162032;
+    border-radius: 5px;
+    padding: 5px 12px;
+    font-size: 12px;
+    color: var(--muted);
+    font-family: monospace;
+  }
+
+  .demo-canvas {
+    padding: 40px;
+    min-height: 320px;
+    position: relative;
+  }
+
+  .fake-site-nav {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 36px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .fake-logo { font-weight: 700; font-size: 14px; color: var(--text); }
+  .fake-nav-links { display: flex; gap: 20px; font-size: 12px; color: var(--muted); }
+
+  .editable-block { position: relative; display: inline-block; cursor: text; }
+  .editable-block:hover .edit-hint,
+  .editable-block:focus-within .edit-hint { opacity: 1; }
+
+  .edit-hint {
+    position: absolute;
+    top: -28px; left: 0;
+    background: var(--green); color: #fff;
+    font-size: 11px; font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.15s;
+    pointer-events: none;
+  }
+
+  .editable-title {
+    font-size: clamp(22px, 4vw, 32px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    outline: none;
+    border: 2px solid transparent;
+    border-radius: 6px;
+    padding: 2px 6px; margin: -2px -6px;
+    transition: border-color 0.15s, background 0.15s;
+    line-height: 1.2; display: block;
+  }
+  .editable-title:hover,
+  .editable-title:focus { border-color: var(--green); background: rgba(34,197,94,0.06); }
+
+  .editable-body {
+    font-size: 13px; color: var(--muted);
+    max-width: 380px;
+    outline: none;
+    border: 2px solid transparent;
+    border-radius: 6px;
+    padding: 2px 6px; margin: 10px -6px 0;
+    transition: border-color 0.15s, background 0.15s;
+    display: block; line-height: 1.6;
+  }
+  .editable-body:hover,
+  .editable-body:focus { border-color: var(--green); background: rgba(34,197,94,0.06); }
+
+  .demo-buttons-row { display: flex; gap: 10px; margin-top: 20px; }
+
+  .fake-btn-p {
+    background: var(--green); color: #fff;
+    border: none; padding: 9px 18px;
+    border-radius: 6px; font-size: 12px; font-weight: 600;
+  }
+
+  .fake-btn-s {
+    background: transparent; color: var(--muted);
+    border: 1px solid var(--border);
+    padding: 9px 18px;
+    border-radius: 6px; font-size: 12px; font-weight: 600;
+  }
+
+  .pp-toolbar {
+    position: absolute; bottom: 16px; right: 16px;
+    background: #0d1829;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    display: flex; align-items: center; gap: 10px;
+    font-size: 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+
+  .pp-toolbar-logo {
+    display: flex; align-items: center; gap: 6px;
+    color: var(--green); font-weight: 700; font-size: 12px;
+  }
+
+  .pp-toolbar-icon {
+    width: 18px; height: 18px;
+    background: var(--green);
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .pp-divider { width: 1px; height: 18px; background: var(--border); }
+
+  .pp-save-btn {
+    background: var(--green); color: #fff;
+    border: none; padding: 6px 14px;
+    border-radius: 5px; font-size: 12px; font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .pp-save-btn:hover { background: var(--green-dim); }
+
+  .pp-status { color: var(--muted); font-size: 11px; }
+
+  .saved-toast {
+    position: absolute; top: 16px; right: 16px;
+    background: var(--green); color: #fff;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px; font-weight: 600;
+    opacity: 0; transform: translateY(-8px);
+    transition: opacity 0.2s, transform 0.2s;
+    pointer-events: none;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .saved-toast.show { opacity: 1; transform: translateY(0); }
+
+  /* HOW IT WORKS */
+  .how-section {
+    max-width: 900px;
+    margin: 0 auto 96px;
+    padding: 0 24px;
+  }
+
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+
+  .step-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px;
+  }
+
+  .step-num {
+    font-size: 11px; font-weight: 700;
+    color: var(--green);
+    letter-spacing: 0.1em;
+    margin-bottom: 16px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .step-num::after {
+    content: ''; flex: 1; height: 1px; background: var(--border);
+  }
+
+  .step-icon {
+    width: 40px; height: 40px;
+    background: rgba(34,197,94,0.1);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 16px;
+  }
+
+  .step-card h3 { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+  .step-card p { font-size: 14px; color: var(--muted); line-height: 1.6; }
+
+  /* FEATURES */
+  .features-section {
+    max-width: 900px;
+    margin: 0 auto 96px;
+    padding: 0 24px;
+  }
+
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+
+  .feature-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    display: flex; gap: 16px; align-items: flex-start;
+  }
+
+  .feature-icon {
+    width: 36px; height: 36px;
+    background: rgba(34,197,94,0.1);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .feature-card h4 { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .feature-card p { font-size: 13px; color: var(--muted); line-height: 1.55; }
+
+  /* PRICING */
+  .pricing-section {
+    max-width: 900px;
+    margin: 0 auto 96px;
+    padding: 0 24px;
+  }
+
+  .plans {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+
+  .plan-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px;
+    position: relative;
+  }
+
+  .plan-card.featured {
+    border-color: var(--green);
+    background: linear-gradient(160deg, rgba(34,197,94,0.08) 0%, var(--card) 100%);
+  }
+
+  .plan-badge {
+    position: absolute; top: -11px; left: 50%;
+    transform: translateX(-50%);
+    background: var(--green); color: #fff;
+    font-size: 11px; font-weight: 700;
+    padding: 3px 12px;
+    border-radius: 100px;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+  }
+
+  .plan-name {
+    font-size: 14px; font-weight: 700;
+    color: var(--muted); margin-bottom: 12px;
+    text-transform: uppercase; letter-spacing: 0.08em;
+  }
+
+  .plan-price {
+    font-size: 40px; font-weight: 800;
+    letter-spacing: -0.03em;
+    margin-bottom: 4px;
+  }
+  .plan-price sup { font-size: 20px; font-weight: 700; vertical-align: super; }
+  .plan-price span { font-size: 14px; font-weight: 500; color: var(--muted); }
+
+  .plan-desc {
+    font-size: 13px; color: var(--muted);
+    margin-bottom: 24px; min-height: 38px;
+  }
+
+  .plan-divider { border: none; border-top: 1px solid var(--border); margin-bottom: 20px; }
+
+  .plan-features {
+    list-style: none;
+    display: flex; flex-direction: column; gap: 10px;
+    margin-bottom: 28px;
+  }
+
+  .plan-features li {
+    font-size: 13px;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .plan-features li::before {
+    content: '';
+    width: 16px; height: 16px;
+    background: rgba(34,197,94,0.15);
+    border-radius: 50%;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%2322C55E'%3E%3Cpath d='M6.5 11.5L3 8l1-1 2.5 2.5 5-5 1 1z'/%3E%3C/svg%3E");
+    background-size: 16px;
+    flex-shrink: 0;
+  }
+
+  .plan-btn {
+    width: 100%; padding: 12px;
+    border-radius: 8px;
+    font-size: 14px; font-weight: 600;
+    cursor: pointer; text-align: center;
+    transition: background 0.15s, border-color 0.15s;
+    text-decoration: none; display: block;
+  }
+
+  .plan-btn-outline {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .plan-btn-outline:hover { border-color: var(--muted); }
+
+  .plan-btn-solid {
+    background: var(--green);
+    border: none; color: #fff;
+  }
+  .plan-btn-solid:hover { background: var(--green-dim); }
+
+  /* CTA BAND */
+  .cta-band {
+    max-width: 900px;
+    margin: 0 auto 96px;
+    padding: 0 24px;
+  }
+
+  .cta-inner {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 64px 48px;
+    text-align: center;
+    position: relative; overflow: hidden;
+  }
+
+  .cta-glow {
+    position: absolute; bottom: -60px; left: 50%;
+    transform: translateX(-50%);
+    width: 400px; height: 200px;
+    background: radial-gradient(ellipse, rgba(34,197,94,0.15) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .cta-inner h2 {
+    font-size: clamp(26px, 4vw, 40px);
+    font-weight: 800; letter-spacing: -0.02em;
+    margin-bottom: 14px;
+  }
+
+  .cta-inner p { color: var(--muted); margin-bottom: 32px; font-size: 16px; }
+
+  /* OPEN SOURCE BAND */
+  .oss-band {
+    max-width: 900px;
+    margin: 0 auto 96px;
+    padding: 0 24px;
+  }
+
+  .oss-inner {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 48px;
+    display: flex; align-items: center; gap: 40px;
+  }
+
+  .oss-icon {
+    width: 64px; height: 64px; flex-shrink: 0;
+    background: rgba(34,197,94,0.1);
+    border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .oss-content h3 { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+  .oss-content p { color: var(--muted); font-size: 15px; margin-bottom: 20px; line-height: 1.6; }
+
+  .oss-links { display: flex; gap: 12px; flex-wrap: wrap; }
+
+  .oss-link {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 9px 18px;
+    border-radius: 8px;
+    font-size: 14px; font-weight: 600;
+    text-decoration: none;
+    transition: background 0.15s, border-color 0.15s;
+  }
+
+  .oss-link-solid {
+    background: var(--green); color: #fff;
+  }
+  .oss-link-solid:hover { background: var(--green-dim); }
+
+  .oss-link-outline {
+    background: transparent; color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .oss-link-outline:hover { border-color: var(--muted); }
+
+  /* FOOTER */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 32px 48px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+
+  footer .logo { font-size: 15px; }
+
+  .footer-links { display: flex; gap: 24px; list-style: none; }
+  .footer-links a {
+    font-size: 13px; color: var(--muted);
+    text-decoration: none; transition: color 0.15s;
+  }
+  .footer-links a:hover { color: var(--text); }
+
+  .footer-right { font-size: 13px; color: var(--muted); }
+
+  /* RESPONSIVE */
+  @media (max-width: 700px) {
+    nav { padding: 16px 20px; }
+    nav ul { display: none; }
+    .steps, .plans { grid-template-columns: 1fr; }
+    .features-grid { grid-template-columns: 1fr; }
+    .oss-inner { flex-direction: column; padding: 32px 24px; gap: 24px; }
+    footer { flex-direction: column; gap: 20px; text-align: center; }
+    .demo-canvas { padding: 24px; }
+    .cta-inner { padding: 40px 24px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="#" class="logo">
+    <div class="logo-icon">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <path d="M4 14L9 4l5 10H4z" fill="#fff"/>
+        <circle cx="9" cy="9" r="2.2" fill="#0B1220"/>
+      </svg>
+    </div>
+    PagePilot
+  </a>
+  <ul>
+    <li><a href="#demo">Demo</a></li>
+    <li><a href="#how">How it works</a></li>
+    <li><a href="#pricing">Pricing</a></li>
+    <li><a href="https://github.com/pilotpageiot-lab/ReactCMS---PagePilot" target="_blank" rel="noopener">GitHub</a></li>
+    <li><a href="#" class="nav-cta">Start free</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="badge">
+    <div class="badge-dot"></div>
+    No developer needed
+  </div>
+  <h1>Your website,<br><em>editable in seconds.</em></h1>
+  <p class="hero-sub">Small changes shouldn't cost $200 and a two-day wait. PagePilot lets you update any text on your website yourself — instantly.</p>
+  <div class="hero-buttons">
+    <a href="#demo" class="btn-primary">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="#fff" stroke-width="1.5"/><path d="M6.5 5.5l4 2.5-4 2.5V5.5z" fill="#fff"/></svg>
+      See it in action
+    </a>
+    <a href="https://github.com/pilotpageiot-lab/ReactCMS---PagePilot" target="_blank" rel="noopener" class="btn-secondary">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      View on GitHub
+    </a>
+  </div>
+  <p class="hero-note">Free to start · No credit card required</p>
+</section>
+
+<!-- LIVE DEMO -->
+<section class="demo-wrap" id="demo">
+  <p class="section-label">Live demo</p>
+  <h2 class="section-title">Click any text. Edit it. Save.</h2>
+  <p class="section-sub">That's the whole product. Try it yourself below.</p>
+
+  <div class="demo-browser">
+    <div class="browser-bar">
+      <div class="browser-dots">
+        <div class="dot dot-r"></div>
+        <div class="dot dot-y"></div>
+        <div class="dot dot-g"></div>
+      </div>
+      <div class="browser-url">yourwebsite.com</div>
+    </div>
+
+    <div class="demo-canvas" id="demoCanvas">
+      <div class="fake-site-nav">
+        <span class="fake-logo">Maplewood Café</span>
+        <div class="fake-nav-links">
+          <span>Menu</span><span>About</span><span>Contact</span>
+        </div>
+      </div>
+
+      <div style="margin-bottom:20px;">
+        <div class="editable-block">
+          <div class="edit-hint">✏ Click to edit</div>
+          <div class="editable-title" contenteditable="true" spellcheck="false">Fresh coffee, good vibes.</div>
+        </div>
+
+        <div class="editable-block" style="display:block; margin-top:14px;">
+          <div class="edit-hint">✏ Click to edit</div>
+          <div class="editable-body" contenteditable="true" spellcheck="false">Open every day from 7am to 9pm. Come in, grab a seat, and stay a while.</div>
+        </div>
+      </div>
+
+      <div class="demo-buttons-row">
+        <div class="fake-btn-p">Order online</div>
+        <div class="fake-btn-s">See our menu</div>
+      </div>
+
+      <div class="pp-toolbar">
+        <div class="pp-toolbar-logo">
+          <div class="pp-toolbar-icon">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+              <path d="M2 8L5 2l3 6H2z" fill="#fff"/>
+            </svg>
+          </div>
+          PagePilot
+        </div>
+        <div class="pp-divider"></div>
+        <span class="pp-status" id="ppStatus">2 editable fields</span>
+        <div class="pp-divider"></div>
+        <button class="pp-save-btn" onclick="saveChanges()">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 7l3 3 6-6" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Save changes
+        </button>
+      </div>
+
+      <div class="saved-toast" id="savedToast">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 7l3 3 6-6" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Changes saved
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="how-section" id="how">
+  <p class="section-label">How it works</p>
+  <h2 class="section-title">Set up in 3 minutes</h2>
+  <p class="section-sub">One script tag. No redesign. No migration.</p>
+
+  <div class="steps">
+    <div class="step-card">
+      <div class="step-num">01</div>
+      <div class="step-icon">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <rect x="3" y="5" width="14" height="10" rx="2" stroke="#22C55E" stroke-width="1.5"/>
+          <path d="M7 10h6M10 7v6" stroke="#22C55E" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h3>Paste one line of code</h3>
+      <p>Add the PagePilot script to your website's HTML. Works with any site — WordPress, Webflow, hand-coded, anything.</p>
+    </div>
+
+    <div class="step-card">
+      <div class="step-num">02</div>
+      <div class="step-icon">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <path d="M5 10h10M10 5l5 5-5 5" stroke="#22C55E" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <h3>Click and edit</h3>
+      <p>Visit your site, click any text you want to change, and type your update. No dashboard, no panels, no login required.</p>
+    </div>
+
+    <div class="step-card">
+      <div class="step-num">03</div>
+      <div class="step-icon">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <path d="M4 10l4 4 8-8" stroke="#22C55E" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <h3>Save and it's live</h3>
+      <p>Hit save. Your change goes live instantly — no deploys, no cache clears, no waiting on anyone.</p>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="features-section">
+  <p class="section-label">Why PagePilot</p>
+  <h2 class="section-title">Everything you need,<br>nothing you don't</h2>
+  <p class="section-sub" style="margin-bottom:40px;">Built for business owners, not developers.</p>
+
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 9a7 7 0 1014 0A7 7 0 002 9z" stroke="#22C55E" stroke-width="1.5"/><path d="M9 5v4l3 2" stroke="#22C55E" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </div>
+      <div>
+        <h4>Instant updates</h4>
+        <p>Changes go live the moment you save. No cache clearing, no re-deploying, no waiting.</p>
+      </div>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="2" y="4" width="14" height="10" rx="2" stroke="#22C55E" stroke-width="1.5"/><path d="M6 9h6" stroke="#22C55E" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </div>
+      <div>
+        <h4>Works on any website</h4>
+        <p>One script tag and you're done. No redesign, no migration, no new platform to learn.</p>
+      </div>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 2L2 7v9h5v-5h4v5h5V7L9 2z" stroke="#22C55E" stroke-width="1.5" stroke-linejoin="round"/></svg>
+      </div>
+      <div>
+        <h4>No learning curve</h4>
+        <p>If you can click and type, you can use PagePilot. We removed every step that wasn't necessary.</p>
+      </div>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M14 9A5 5 0 114 9" stroke="#22C55E" stroke-width="1.5" stroke-linecap="round"/><path d="M9 2v7" stroke="#22C55E" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </div>
+      <div>
+        <h4>Edit history</h4>
+        <p>Every change is logged. Made a mistake? Roll back to any previous version with one click.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section class="pricing-section" id="pricing">
+  <p class="section-label">Pricing</p>
+  <h2 class="section-title">Simple and honest</h2>
+  <p class="section-sub">No per-edit fees. No surprise bills.</p>
+
+  <div class="plans">
+    <div class="plan-card">
+      <div class="plan-name">Free</div>
+      <div class="plan-price">$0</div>
+      <div class="plan-desc">1 website, forever free</div>
+      <hr class="plan-divider"/>
+      <ul class="plan-features">
+        <li>1 website</li>
+        <li>Unlimited edits</li>
+        <li>Instant publishing</li>
+        <li>Edit history (7 days)</li>
+      </ul>
+      <a href="#" class="plan-btn plan-btn-outline">Get started free</a>
+    </div>
+
+    <div class="plan-card featured">
+      <div class="plan-badge">Most popular</div>
+      <div class="plan-name">Pro</div>
+      <div class="plan-price"><sup>$</sup>9<span>/mo</span></div>
+      <div class="plan-desc">Everything you need for one business</div>
+      <hr class="plan-divider"/>
+      <ul class="plan-features">
+        <li>3 websites</li>
+        <li>Unlimited edits</li>
+        <li>Instant publishing</li>
+        <li>Edit history (90 days)</li>
+        <li>Password protection</li>
+        <li>Priority support</li>
+      </ul>
+      <a href="#" class="plan-btn plan-btn-solid">Start free trial</a>
+    </div>
+
+    <div class="plan-card">
+      <div class="plan-name">Agency</div>
+      <div class="plan-price"><sup>$</sup>49<span>/mo</span></div>
+      <div class="plan-desc">Manage content for all your clients</div>
+      <hr class="plan-divider"/>
+      <ul class="plan-features">
+        <li>Unlimited websites</li>
+        <li>Unlimited edits</li>
+        <li>Client login access</li>
+        <li>Edit history (1 year)</li>
+        <li>White-label toolbar</li>
+        <li>Dedicated support</li>
+      </ul>
+      <a href="#" class="plan-btn plan-btn-outline">Contact us</a>
+    </div>
+  </div>
+</section>
+
+<!-- OPEN SOURCE BAND -->
+<section class="oss-band">
+  <div class="oss-inner">
+    <div class="oss-icon">
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+        <path d="M16 2C8.268 2 2 8.268 2 16c0 6.195 4.008 11.427 9.572 13.28.7.128.956-.304.956-.676 0-.332-.012-1.433-.018-2.608-3.895.847-4.715-1.879-4.715-1.879-.636-1.617-1.553-2.047-1.553-2.047-1.27-.868.096-.851.096-.851 1.404.099 2.142 1.44 2.142 1.44 1.248 2.139 3.272 1.521 4.069 1.163.127-.904.488-1.521.888-1.87-3.108-.353-6.376-1.554-6.376-6.916 0-1.527.545-2.775 1.44-3.754-.144-.354-.624-1.776.136-3.703 0 0 1.174-.376 3.845 1.433A13.38 13.38 0 0116 9.405c1.188.005 2.384.16 3.502.472 2.67-1.81 3.842-1.433 3.842-1.433.762 1.927.282 3.349.138 3.703.897.979 1.438 2.227 1.438 3.754 0 5.376-3.273 6.559-6.39 6.905.502.433.95 1.287.95 2.594 0 1.873-.017 3.382-.017 3.842 0 .375.252.812.962.674C25.995 27.422 30 22.193 30 16c0-7.732-6.268-14-14-14z" fill="#22C55E"/>
+      </svg>
+    </div>
+    <div class="oss-content">
+      <h3>Built in the open</h3>
+      <p>The ReactCMS — PagePilot core is open source. Built on the MERN stack with JWT authentication, role-based access control, multisite support, and a headless REST API. Star the repo, open issues, or contribute.</p>
+      <div class="oss-links">
+        <a href="https://github.com/pilotpageiot-lab/ReactCMS---PagePilot" target="_blank" rel="noopener" class="oss-link oss-link-solid">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          View on GitHub
+        </a>
+        <a href="https://github.com/pilotpageiot-lab/ReactCMS---PagePilot/issues" target="_blank" rel="noopener" class="oss-link oss-link-outline">Open an issue</a>
+        <a href="https://github.com/pilotpageiot-lab/ReactCMS---PagePilot/blob/main/README.md" target="_blank" rel="noopener" class="oss-link oss-link-outline">Read the docs</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA BAND -->
+<section class="cta-band">
+  <div class="cta-inner">
+    <div class="cta-glow"></div>
+    <h2>Stop waiting on developers<br>for small changes.</h2>
+    <p>Get PagePilot on your website today. Free to start, no credit card needed.</p>
+    <div class="hero-buttons">
+      <a href="#" class="btn-primary">Start for free</a>
+      <a href="#demo" class="btn-secondary">Try the demo first</a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <a href="#" class="logo">
+    <div class="logo-icon">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <path d="M4 14L9 4l5 10H4z" fill="#fff"/>
+        <circle cx="9" cy="9" r="2.2" fill="#0B1220"/>
+      </svg>
+    </div>
+    PagePilot
+  </a>
+  <ul class="footer-links">
+    <li><a href="https://github.com/pilotpageiot-lab/ReactCMS---PagePilot" target="_blank">GitHub</a></li>
+    <li><a href="https://github.com/pilotpageiot-lab/ReactCMS---PagePilot/blob/main/README.md" target="_blank">Docs</a></li>
+    <li><a href="https://github.com/pilotpageiot-lab/ReactCMS---PagePilot/issues" target="_blank">Support</a></li>
+  </ul>
+  <div class="footer-right">© 2026 PagePilot · pilotpageiot-lab</div>
+</footer>
+
+<script>
+  let editCount = 0;
+
+  document.querySelectorAll('[contenteditable]').forEach(el => {
+    el.addEventListener('input', () => {
+      editCount++;
+      const s = document.getElementById('ppStatus');
+      s.textContent = editCount === 1 ? '1 unsaved change' : `${editCount} unsaved changes`;
+      s.style.color = '#22C55E';
+    });
+  });
+
+  function saveChanges() {
+    const toast = document.getElementById('savedToast');
+    const status = document.getElementById('ppStatus');
+    toast.classList.add('show');
+    status.textContent = 'All changes saved';
+    status.style.color = '#22C55E';
+    editCount = 0;
+    setTimeout(() => {
+      toast.classList.remove('show');
+      status.textContent = '2 editable fields';
+      status.style.color = '';
+    }, 2200);
+  }
+
+  document.querySelectorAll('a[href^="#"]').forEach(a => {
+    a.addEventListener('click', e => {
+      const t = document.querySelector(a.getAttribute('href'));
+      if (t) { e.preventDefault(); t.scrollIntoView({ behavior: 'smooth' }); }
+    });
+  });
+</script>
+</body>
+</html>
