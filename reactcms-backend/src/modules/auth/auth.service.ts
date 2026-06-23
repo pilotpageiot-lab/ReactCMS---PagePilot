@@ -1,20 +1,27 @@
 import { pool } from '../../lib/db/pool';
+import { v4 as uuidv4 } from 'uuid';
 import {
   signAccessToken, signRefreshToken, verifyRefreshToken, expiryToSeconds,
 } from '../../lib/jwt';
 import {
   storeRefreshToken, validateRefreshToken, revokeRefreshToken,
 } from '../../lib/redis';
+import { redis } from '../../lib/redis';
 import { hashPassword, verifyPassword } from '../../utils/hash';
-import { ConflictError, UnauthorizedError, NotFoundError } from '../../utils/errors';
+import { ConflictError, UnauthorizedError, NotFoundError, BadRequestError } from '../../utils/errors';
 import { config } from '../../config';
 import { getPlanLimits } from '../../lib/planLimits';
+import { sendVerificationEmail } from '../../lib/email';
 import type { RegisterDto, LoginDto } from './auth.schema';
 
 interface UserRow {
   id: string; email: string; name: string;
-  role: string; password_hash: string; created_at: Date;
+  role: string; password_hash: string;
+  email_verified_at: Date | null; created_at: Date;
 }
+
+const VERIFY_TOKEN_PREFIX = 'email_verify:';
+const VERIFY_TOKEN_TTL = 24 * 60 * 60; // 24 hours
 
 async function issueTokens(user: Pick<UserRow, 'id' | 'email' | 'role'>) {
   const access_token = signAccessToken({ sub: user.id, email: user.email, role: user.role });
@@ -23,8 +30,18 @@ async function issueTokens(user: Pick<UserRow, 'id' | 'email' | 'role'>) {
   return { access_token, refresh_token };
 }
 
+function userResponse(user: UserRow) {
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    email_verified: user.email_verified_at !== null,
+    created_at: user.created_at,
+  };
+}
+
 export async function register(dto: RegisterDto) {
-  // SECURITY FIX: run bcrypt unconditionally to prevent email enumeration via timing
   const [existing, password_hash] = await Promise.all([
     pool.query('SELECT id FROM users WHERE email = $1', [dto.email]),
     hashPassword(dto.password),
@@ -33,17 +50,23 @@ export async function register(dto: RegisterDto) {
 
   const { rows } = await pool.query<UserRow>(
     `INSERT INTO users (email, name, password_hash) VALUES ($1, $2, $3)
-     RETURNING id, email, name, role, created_at`,
+     RETURNING id, email, name, role, email_verified_at, created_at`,
     [dto.email, dto.name, password_hash],
   );
   const user = rows[0]!;
   const tokens = await issueTokens(user);
-  return { user: { id: user.id, email: user.email, name: user.name }, ...tokens };
+
+  // Generate verification token and send email
+  const verifyToken = uuidv4();
+  await redis.set(VERIFY_TOKEN_PREFIX + verifyToken, user.id, { EX: VERIFY_TOKEN_TTL });
+  sendVerificationEmail(user.email, user.name, verifyToken).catch(() => {});
+
+  return { user: userResponse(user), ...tokens };
 }
 
 export async function login(dto: LoginDto) {
   const { rows } = await pool.query<UserRow>(
-    'SELECT id, email, name, role, password_hash FROM users WHERE email = $1',
+    'SELECT id, email, name, role, password_hash, email_verified_at, created_at FROM users WHERE email = $1',
     [dto.email],
   );
   const user = rows[0];
@@ -51,7 +74,7 @@ export async function login(dto: LoginDto) {
   const valid = await verifyPassword(dto.password, user.password_hash);
   if (!valid) throw new UnauthorizedError('Invalid credentials');
   const tokens = await issueTokens(user);
-  return { user: { id: user.id, email: user.email, name: user.name }, ...tokens };
+  return { user: userResponse(user), ...tokens };
 }
 
 export async function refresh(refreshToken: string) {
@@ -75,7 +98,7 @@ export async function refresh(refreshToken: string) {
   return { access_token, refresh_token: new_refresh_token, expires_in: 900 };
 }
 
-export async function logout(userId: string, refreshToken?: string) {
+export async function logout(_userId: string, refreshToken?: string) {
   if (refreshToken) {
     try {
       const payload = verifyRefreshToken(refreshToken);
@@ -86,11 +109,39 @@ export async function logout(userId: string, refreshToken?: string) {
 
 export async function getMe(userId: string) {
   const { rows } = await pool.query<UserRow>(
-    'SELECT id, email, name, role, created_at FROM users WHERE id = $1', [userId],
+    'SELECT id, email, name, role, email_verified_at, created_at FROM users WHERE id = $1', [userId],
   );
   const user = rows[0];
   if (!user) throw new NotFoundError('User');
-  return { id: user.id, email: user.email, name: user.name, role: user.role, created_at: user.created_at };
+  return userResponse(user);
+}
+
+export async function verifyEmail(token: string) {
+  const userId = await redis.get(VERIFY_TOKEN_PREFIX + token);
+  if (!userId) throw new BadRequestError('Invalid or expired verification link');
+
+  const { rows } = await pool.query<UserRow>(
+    'UPDATE users SET email_verified_at = now() WHERE id = $1 RETURNING id, email, name, role, email_verified_at, created_at',
+    [userId],
+  );
+  if (!rows[0]) throw new NotFoundError('User');
+
+  await redis.del(VERIFY_TOKEN_PREFIX + token);
+  return userResponse(rows[0]);
+}
+
+export async function resendVerification(userId: string) {
+  const { rows } = await pool.query<UserRow>(
+    'SELECT id, email, name, email_verified_at FROM users WHERE id = $1',
+    [userId],
+  );
+  const user = rows[0];
+  if (!user) throw new NotFoundError('User');
+  if (user.email_verified_at) throw new BadRequestError('Email already verified');
+
+  const verifyToken = uuidv4();
+  await redis.set(VERIFY_TOKEN_PREFIX + verifyToken, user.id, { EX: VERIFY_TOKEN_TTL });
+  await sendVerificationEmail(user.email, user.name, verifyToken);
 }
 
 export async function changePassword(email: string, oldPassword: string, newPassword: string) {

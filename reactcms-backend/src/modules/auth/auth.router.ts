@@ -116,4 +116,29 @@ router.get(
   },
 );
 
+// Verify email address via token
+router.post(
+  '/verify-email',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { token } = req.body as { token?: string };
+      if (!token) { res.status(400).json({ error: 'BAD_REQUEST', message: 'token required' }); return; }
+      const user = await authService.verifyEmail(token);
+      ok(res, { message: 'Email verified', user });
+    } catch (err) { next(err); }
+  },
+);
+
+// Resend verification email (authenticated)
+router.post(
+  '/resend-verification',
+  requireAuth,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await authService.resendVerification(req.user!.id);
+      ok(res, { message: 'Verification email sent' });
+    } catch (err) { next(err); }
+  },
+);
+
 export { router as authRouter };

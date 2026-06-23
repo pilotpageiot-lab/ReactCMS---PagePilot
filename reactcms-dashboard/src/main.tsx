@@ -11,6 +11,7 @@ import { WebsiteListPage } from '@/pages/WebsiteListPage';
 import { WebsiteDetailPage } from '@/pages/WebsiteDetailPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { PagePilotPage } from '@/pages/PagePilotPage';
+import { VerifyEmailPage } from '@/pages/VerifyEmailPage';
 
 import './styles.css';
 
@@ -32,6 +33,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
           <Route path="/websites/:id/pagepilot" element={<PagePilotPage />} />
           <Route element={<AppLayout />}>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />

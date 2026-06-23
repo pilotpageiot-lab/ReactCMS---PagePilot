@@ -27,6 +27,10 @@ const schema = z.object({
   S3_REGION: z.string().default('eu-west-1'),
   CDN_BASE_URL: z.string().url().optional(),
 
+  RESEND_API_KEY: z.string().optional(),
+  RESEND_FROM_EMAIL: z.string().email().default('noreply@pagepilot.io'),
+  DASHBOARD_URL: z.string().url().default('http://localhost:5173'),
+
   RATE_LIMIT_AUTH_MAX: z.coerce.number().default(5),
   RATE_LIMIT_API_MAX: z.coerce.number().default(120),
   RATE_LIMIT_SDK_MAX: z.coerce.number().default(500),

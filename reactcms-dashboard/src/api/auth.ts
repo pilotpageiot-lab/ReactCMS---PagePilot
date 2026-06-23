@@ -34,4 +34,10 @@ export const authApi = {
 
   planUsage: (): Promise<{ plan: string; websites_used: number; websites_limit: number; history_days: number }> =>
     client.get('/v1/auth/plan-usage'),
+
+  verifyEmail: (token: string): Promise<{ message: string; user: User }> =>
+    client.post('/v1/auth/verify-email', { token }),
+
+  resendVerification: (): Promise<{ message: string }> =>
+    client.post('/v1/auth/resend-verification', {}),
 };
