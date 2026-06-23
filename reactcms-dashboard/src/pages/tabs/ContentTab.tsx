@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Trash2, Globe, EyeOff, Clock, FileText, Scan, ArrowLeft, AlertTriangle } from 'lucide-react';
+import { Plus, Search, Trash2, Globe, EyeOff, Clock, FileText, Scan, ArrowLeft, AlertTriangle, Zap, MousePointerClick, Code2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { clsx } from 'clsx';
 import { Button } from '@/components/ui/Button';
@@ -21,6 +21,10 @@ const CONTENT_TYPES: ContentType[] = ['text', 'richtext', 'image', 'json'];
 
 // ── Content row (left panel list item) ───────────────────────────────────────
 
+function humanizeKey(key: string): string {
+  return key.replace(/^[a-z]-/, '').replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 function ContentRow({
   item,
   selected,
@@ -32,39 +36,67 @@ function ContentRow({
   onClick: () => void;
   onDelete: () => void;
 }) {
+  const preview = item.value
+    ? item.value.replace(/<[^>]*>/g, '').slice(0, 50) + (item.value.length > 50 ? '…' : '')
+    : '';
+
   return (
     <div
       onClick={onClick}
       className={clsx(
-        'group flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors border-l-2',
+        'group flex items-start gap-3 px-3 sm:px-4 py-2.5 sm:py-3 cursor-pointer transition-all border-l-2',
         selected
           ? 'bg-indigo-50 border-l-indigo-600'
           : 'border-l-transparent hover:bg-gray-50',
       )}
     >
-      <div className={clsx('text-gray-400', selected && 'text-indigo-500')}>
+      {/* Type badge */}
+      <div
+        className={clsx(
+          'w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-bold uppercase',
+          item.content_type === 'richtext' ? 'bg-purple-100 text-purple-600' :
+          item.content_type === 'image'    ? 'bg-blue-100 text-blue-600' :
+          item.content_type === 'json'     ? 'bg-amber-100 text-amber-600' :
+                                             'bg-gray-100 text-gray-500',
+          selected && 'ring-2 ring-indigo-300',
+        )}
+      >
         <ContentTypeIcon type={item.content_type as ContentType} />
       </div>
+
       <div className="flex-1 min-w-0">
-        <p className={clsx('text-sm font-mono truncate', selected ? 'text-indigo-700' : 'text-gray-900')}>
+        {/* Human-readable name */}
+        <p className={clsx('text-[13px] font-medium truncate leading-tight', selected ? 'text-indigo-700' : 'text-gray-900')}>
+          {humanizeKey(item.cms_key)}
+        </p>
+        {/* Key name + preview */}
+        <p className="text-[10px] font-mono text-gray-400 truncate mt-0.5">
           {item.cms_key}
         </p>
-        <p className="text-xs text-gray-400 truncate mt-0.5">
-          {item.value ? item.value.slice(0, 60) + (item.value.length > 60 ? '…' : '') : 'No value'}
-        </p>
+        {preview && (
+          <p className="text-[11px] text-gray-400 truncate mt-1 leading-snug">
+            {preview}
+          </p>
+        )}
       </div>
-      <div className="flex items-center gap-2 shrink-0">
+
+      {/* Status + actions */}
+      <div className="flex flex-col items-end gap-1 shrink-0 mt-0.5">
         {item.is_published ? (
-          <span title="Published" className="text-emerald-500"><Globe size={12} /></span>
+          <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">
+            <Globe size={8} /> Live
+          </span>
         ) : (
-          <span title="Draft" className="text-gray-300"><EyeOff size={12} /></span>
+          <span className="inline-flex items-center gap-1 text-[9px] font-medium text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">
+            <EyeOff size={8} /> Draft
+          </span>
         )}
         <button
           onClick={(e) => { e.stopPropagation(); onDelete(); }}
-          className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 rounded transition-all"
+          className="opacity-0 group-hover:opacity-100 p-0.5 text-gray-300 hover:text-red-500 rounded transition-all"
           title="Delete"
         >
-          <Trash2 size={12} />
+          <Trash2 size={11} />
         </button>
       </div>
     </div>
@@ -263,6 +295,33 @@ function EditorPanel({
   );
 }
 
+// ── Footer stats with progress bar ───────────────────────────────────────────
+
+function FooterStats({ items, onDeleteAll }: { items: ContentItem[]; onDeleteAll: () => void }) {
+  const published = items.filter((i) => i.is_published).length;
+  const pct = items.length > 0 ? Math.round((published / items.length) * 100) : 0;
+
+  return (
+    <div className="px-3 sm:px-4 py-2 sm:py-2.5 border-t border-gray-100 space-y-1.5">
+      <div className="flex items-center justify-between text-[10px] text-gray-400">
+        <span className="font-medium">{published}/{items.length} published ({pct}%)</span>
+        <button
+          onClick={onDeleteAll}
+          className="text-[10px] text-red-400 hover:text-red-600 font-medium transition-colors"
+        >
+          Delete all
+        </button>
+      </div>
+      <div className="w-full h-1 bg-gray-100 rounded-full overflow-hidden">
+        <div
+          className="h-full rounded-full transition-all duration-500"
+          style={{ width: `${pct}%`, background: pct === 100 ? '#22c55e' : '#6366f1' }}
+        />
+      </div>
+    </div>
+  );
+}
+
 // ── Main content tab ──────────────────────────────────────────────────────────
 
 export function ContentTab({ websiteId, customDomain }: { websiteId: string; customDomain?: string | null }) {
@@ -315,7 +374,7 @@ export function ContentTab({ websiteId, customDomain }: { websiteId: string; cus
       {/* Left panel: content list — full width on mobile, fixed sidebar on md+ */}
       <div className={clsx(
         'flex flex-col border-r border-gray-100 bg-white',
-        'w-full md:w-72 md:shrink-0',
+        'w-full md:w-80 md:shrink-0',
         selectedItem ? 'hidden md:flex' : 'flex',
       )}>
         {/* Search + new */}
@@ -351,22 +410,33 @@ export function ContentTab({ websiteId, customDomain }: { websiteId: string; cus
             </Button>
           </div>
 
-          {/* Type filter */}
+          {/* Type filter with counts */}
           <div className="flex gap-1 overflow-x-auto">
-            {['', ...CONTENT_TYPES].map((t) => (
-              <button
-                key={t || 'all'}
-                onClick={() => setFilterType(t)}
-                className={clsx(
-                  'px-2 py-1 text-xs rounded-md transition-colors font-medium whitespace-nowrap',
-                  filterType === t
-                    ? 'bg-indigo-100 text-indigo-700'
-                    : 'text-gray-500 hover:bg-gray-100',
-                )}
-              >
-                {t || 'All'}
-              </button>
-            ))}
+            {['', ...CONTENT_TYPES].map((t) => {
+              const count = t ? items.filter((i) => i.content_type === t).length : items.length;
+              return (
+                <button
+                  key={t || 'all'}
+                  onClick={() => setFilterType(t)}
+                  className={clsx(
+                    'px-2 py-1 text-[11px] rounded-md transition-colors font-medium whitespace-nowrap flex items-center gap-1',
+                    filterType === t
+                      ? 'bg-indigo-100 text-indigo-700'
+                      : 'text-gray-500 hover:bg-gray-100',
+                  )}
+                >
+                  {t || 'All'}
+                  {count > 0 && (
+                    <span className={clsx(
+                      'text-[9px] min-w-[14px] h-[14px] flex items-center justify-center rounded-full',
+                      filterType === t ? 'bg-indigo-200 text-indigo-800' : 'bg-gray-200 text-gray-500',
+                    )}>
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -400,17 +470,9 @@ export function ContentTab({ websiteId, customDomain }: { websiteId: string; cus
           )}
         </div>
 
-        {/* Footer stats */}
+        {/* Footer stats with progress */}
         {items.length > 0 && (
-          <div className="px-3 sm:px-4 py-2 sm:py-2.5 border-t border-gray-100 text-xs text-gray-500 flex items-center justify-between">
-            <span>{items.length} keys</span>
-            <button
-              onClick={() => setDeleteAllOpen(true)}
-              className="text-xs text-red-400 hover:text-red-600 font-medium transition-colors"
-            >
-              Delete all
-            </button>
-          </div>
+          <FooterStats items={items} onDeleteAll={() => setDeleteAllOpen(true)} />
         )}
       </div>
 
@@ -428,14 +490,28 @@ export function ContentTab({ websiteId, customDomain }: { websiteId: string; cus
             onBack={() => setSelectedKey(null)}
           />
         ) : (
-          <div className="flex flex-col items-center justify-center h-full text-center p-4">
-            <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center mb-3 text-gray-400">
-              <FileText size={20} />
+          <div className="flex flex-col items-center justify-center h-full text-center p-6 max-w-sm mx-auto">
+            <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-4 text-gray-300">
+              <MousePointerClick size={24} />
             </div>
-            <p className="text-sm font-medium text-gray-700">Select a key to edit</p>
-            <p className="text-xs text-gray-400 mt-1">
-              {items.length > 0 ? 'Click any key from the list' : 'Create your first content key'}
+            <p className="text-sm font-semibold text-gray-700 mb-1">Select a content key</p>
+            <p className="text-xs text-gray-400 leading-relaxed mb-5">
+              {items.length > 0
+                ? 'Pick any key from the left panel to view and edit its content.'
+                : 'Start by creating your first content key or scanning your website.'}
             </p>
+            {items.length > 0 ? (
+              <div className="flex flex-wrap gap-4 text-[10px] text-gray-400">
+                <div className="flex items-center gap-1.5"><Globe size={10} className="text-emerald-500" /> {items.filter(i => i.is_published).length} published</div>
+                <div className="flex items-center gap-1.5"><EyeOff size={10} /> {items.filter(i => !i.is_published).length} drafts</div>
+                <div className="flex items-center gap-1.5"><FileText size={10} /> {items.length} total</div>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <Button size="sm" variant="primary" icon={<Plus size={12} />} onClick={() => setNewKeyOpen(true)}>New key</Button>
+                <Button size="sm" variant="secondary" icon={<Scan size={12} />} onClick={() => setScanOpen(true)}>Scan site</Button>
+              </div>
+            )}
           </div>
         )}
       </div>
