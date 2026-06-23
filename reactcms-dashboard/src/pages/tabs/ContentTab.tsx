@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Search, Trash2, Globe, EyeOff, Clock, FileText, Scan, ArrowLeft, AlertTriangle, MousePointerClick } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -36,69 +36,52 @@ function ContentRow({
   onClick: () => void;
   onDelete: () => void;
 }) {
-  const preview = item.value
-    ? item.value.replace(/<[^>]*>/g, '').slice(0, 50) + (item.value.length > 50 ? '…' : '')
-    : '';
-
   return (
     <div
       onClick={onClick}
+      data-key={item.cms_key}
       className={clsx(
-        'group flex items-start gap-3 px-3 sm:px-4 py-2.5 sm:py-3 cursor-pointer transition-all border-l-2',
+        'group flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-all border-l-2',
         selected
           ? 'bg-indigo-50 border-l-indigo-600'
           : 'border-l-transparent hover:bg-gray-50',
       )}
     >
-      {/* Type badge */}
-      <div
-        className={clsx(
-          'w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-bold uppercase',
-          item.content_type === 'richtext' ? 'bg-purple-100 text-purple-600' :
-          item.content_type === 'image'    ? 'bg-blue-100 text-blue-600' :
-          item.content_type === 'json'     ? 'bg-amber-100 text-amber-600' :
-                                             'bg-gray-100 text-gray-500',
-          selected && 'ring-2 ring-indigo-300',
-        )}
-      >
-        <ContentTypeIcon type={item.content_type as ContentType} />
-      </div>
+      {/* Status dot */}
+      <span
+        className={clsx('w-1.5 h-1.5 rounded-full shrink-0', item.is_published ? 'bg-emerald-400' : 'bg-gray-300')}
+        title={item.is_published ? 'Published' : 'Draft'}
+      />
 
+      {/* Name + key */}
       <div className="flex-1 min-w-0">
-        {/* Human-readable name */}
-        <p className={clsx('text-[13px] font-medium truncate leading-tight', selected ? 'text-indigo-700' : 'text-gray-900')}>
-          {humanizeKey(item.cms_key)}
-        </p>
-        {/* Key name + preview */}
-        <p className="text-[10px] font-mono text-gray-400 truncate mt-0.5">
-          {item.cms_key}
-        </p>
-        {preview && (
-          <p className="text-[11px] text-gray-400 truncate mt-1 leading-snug">
-            {preview}
+        <div className="flex items-center gap-1.5">
+          <p className={clsx('text-[12.5px] font-medium truncate', selected ? 'text-indigo-700' : 'text-gray-900')}>
+            {humanizeKey(item.cms_key)}
           </p>
-        )}
+          <span
+            className={clsx(
+              'text-[9px] font-semibold uppercase px-1 py-px rounded shrink-0',
+              item.content_type === 'richtext' ? 'bg-purple-100 text-purple-500' :
+              item.content_type === 'image'    ? 'bg-blue-100 text-blue-500' :
+              item.content_type === 'json'     ? 'bg-amber-100 text-amber-500' :
+                                                  'bg-gray-100 text-gray-400',
+            )}
+          >
+            {item.content_type === 'richtext' ? 'rich' : item.content_type}
+          </span>
+        </div>
+        <p className="text-[10px] font-mono text-gray-400 truncate">{item.cms_key}</p>
       </div>
 
-      {/* Status + actions */}
-      <div className="flex flex-col items-end gap-1 shrink-0 mt-0.5">
-        {item.is_published ? (
-          <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">
-            <Globe size={8} /> Live
-          </span>
-        ) : (
-          <span className="inline-flex items-center gap-1 text-[9px] font-medium text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">
-            <EyeOff size={8} /> Draft
-          </span>
-        )}
-        <button
-          onClick={(e) => { e.stopPropagation(); onDelete(); }}
-          className="opacity-0 group-hover:opacity-100 p-0.5 text-gray-300 hover:text-red-500 rounded transition-all"
-          title="Delete"
-        >
-          <Trash2 size={11} />
-        </button>
-      </div>
+      {/* Delete */}
+      <button
+        onClick={(e) => { e.stopPropagation(); onDelete(); }}
+        className="opacity-0 group-hover:opacity-100 p-0.5 text-gray-300 hover:text-red-500 rounded transition-all shrink-0"
+        title="Delete"
+      >
+        <Trash2 size={11} />
+      </button>
     </div>
   );
 }
@@ -333,6 +316,14 @@ export function ContentTab({ websiteId, customDomain }: { websiteId: string; cus
   const [deletingKey, setDeletingKey] = useState<string | null>(null);
   const [deleteAllOpen, setDeleteAllOpen] = useState(false);
   const [filterType, setFilterType] = useState('');
+  const listRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll the selected item into view
+  useEffect(() => {
+    if (!selectedKey || !listRef.current) return;
+    const el = listRef.current.querySelector(`[data-key="${selectedKey}"]`);
+    if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [selectedKey]);
 
   const { data, isLoading } = useQuery({
     queryKey: ['content', websiteId, { search, filterType }],
@@ -441,7 +432,7 @@ export function ContentTab({ websiteId, customDomain }: { websiteId: string; cus
         </div>
 
         {/* List */}
-        <div className="flex-1 overflow-y-auto">
+        <div ref={listRef} className="flex-1 overflow-y-auto">
           {isLoading ? (
             <div className="p-4 space-y-2">
               {[1, 2, 3, 4].map((i) => (
