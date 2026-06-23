@@ -14,14 +14,14 @@ export async function sendVerificationEmail(
   to: string,
   name: string,
   token: string,
-): Promise<void> {
+): Promise<{ sent: boolean; method: 'email' | 'console' }> {
   const verifyUrl = `${config.DASHBOARD_URL}/verify-email?token=${encodeURIComponent(token)}`;
   const client = getClient();
 
   if (!client) {
     logger.warn('RESEND_API_KEY not set — logging verification link instead', { to, verifyUrl });
     console.log(`\n📧 Email verification for ${to}:\n   ${verifyUrl}\n`);
-    return;
+    return { sent: true, method: 'console' };
   }
 
   try {
@@ -51,8 +51,9 @@ export async function sendVerificationEmail(
       `,
     });
     logger.info('Verification email sent', { to });
+    return { sent: true, method: 'email' };
   } catch (err) {
     logger.error('Failed to send verification email', { to, error: (err as Error).message });
-    throw err;
+    return { sent: false, method: 'email' };
   }
 }

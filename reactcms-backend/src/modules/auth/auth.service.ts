@@ -59,9 +59,9 @@ export async function register(dto: RegisterDto) {
   // Generate verification token and send email
   const verifyToken = uuidv4();
   await redis.set(VERIFY_TOKEN_PREFIX + verifyToken, user.id, { EX: VERIFY_TOKEN_TTL });
-  sendVerificationEmail(user.email, user.name, verifyToken).catch(() => {});
+  const emailResult = await sendVerificationEmail(user.email, user.name, verifyToken);
 
-  return { user: userResponse(user), ...tokens };
+  return { user: userResponse(user), ...tokens, email_sent: emailResult.sent, email_method: emailResult.method };
 }
 
 export async function login(dto: LoginDto) {
@@ -150,7 +150,8 @@ export async function resendVerification(userId: string) {
 
   const verifyToken = uuidv4();
   await redis.set(VERIFY_TOKEN_PREFIX + verifyToken, user.id, { EX: VERIFY_TOKEN_TTL });
-  await sendVerificationEmail(user.email, user.name, verifyToken);
+  const result = await sendVerificationEmail(user.email, user.name, verifyToken);
+  return { sent: result.sent, method: result.method };
 }
 
 export async function changePassword(email: string, oldPassword: string, newPassword: string) {

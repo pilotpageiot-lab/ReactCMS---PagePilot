@@ -28,7 +28,7 @@ const schema = z.object({
   CDN_BASE_URL: z.string().url().optional(),
 
   RESEND_API_KEY: z.string().optional(),
-  RESEND_FROM_EMAIL: z.string().email().default('noreply@pagepilot.io'),
+  RESEND_FROM_EMAIL: z.string().email().default('onboarding@resend.dev'),
   DASHBOARD_URL: z.string().url().default('http://localhost:5173'),
 
   RATE_LIMIT_AUTH_MAX: z.coerce.number().default(5),

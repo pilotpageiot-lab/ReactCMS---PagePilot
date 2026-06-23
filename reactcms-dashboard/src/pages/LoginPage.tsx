@@ -48,13 +48,19 @@ export function LoginPage() {
         setNewPassword('');
         setConfirmPassword('');
         setTimeout(() => switchTab('login'), 1500);
-      } else {
-        const result =
-          tab === 'login'
-            ? await authApi.login(email, password)
-            : await authApi.register(name, email, password);
+      } else if (tab === 'login') {
+        const result = await authApi.login(email, password);
         setUser(result.user);
         navigate('/dashboard', { replace: true });
+      } else {
+        const result = await authApi.register(name, email, password);
+        setUser(result.user);
+        if (!result.user.email_verified) {
+          setSuccess('Account created! Check your email for a verification link.');
+          setTimeout(() => navigate('/dashboard', { replace: true }), 2000);
+        } else {
+          navigate('/dashboard', { replace: true });
+        }
       }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.');
