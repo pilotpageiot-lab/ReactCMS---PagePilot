@@ -58,6 +58,56 @@ export async function sendVerificationEmail(
   }
 }
 
+export async function sendInviteEmail(
+  to: string,
+  inviteeName: string,
+  websiteName: string,
+  role: string,
+  invitedByName: string,
+): Promise<{ sent: boolean; method: 'email' | 'console' }> {
+  const dashboardUrl = `${config.DASHBOARD_URL}/websites`;
+  const client = getClient();
+
+  if (!client) {
+    logger.warn('RESEND_API_KEY not set — logging invite instead', { to, websiteName });
+    console.log(`\n📨 Invite for ${to} to "${websiteName}" as ${role}:\n   ${dashboardUrl}\n`);
+    return { sent: true, method: 'console' };
+  }
+
+  try {
+    await client.emails.send({
+      from: config.RESEND_FROM_EMAIL,
+      to,
+      subject: `You've been invited to ${websiteName} on PagePilot`,
+      html: `
+        <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:40px 24px;">
+          <div style="text-align:center;margin-bottom:32px;">
+            <div style="display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;background:#22c55e;border-radius:10px;margin-bottom:12px;">
+              <span style="color:#fff;font-weight:800;font-size:14px;">PP</span>
+            </div>
+            <h1 style="font-size:20px;font-weight:700;color:#0f172a;margin:0;">You're invited!</h1>
+          </div>
+          <p style="font-size:15px;color:#334155;line-height:1.6;">Hi ${inviteeName},</p>
+          <p style="font-size:15px;color:#334155;line-height:1.6;"><strong>${invitedByName}</strong> has invited you to collaborate on <strong>${websiteName}</strong> as <strong>${role}</strong>.</p>
+          <div style="text-align:center;margin:32px 0;">
+            <a href="${dashboardUrl}" style="display:inline-block;background:#22c55e;color:#fff;padding:12px 32px;border-radius:8px;font-size:15px;font-weight:600;text-decoration:none;">
+              View invitation
+            </a>
+          </div>
+          <p style="font-size:13px;color:#94a3b8;line-height:1.5;">Log in to your PagePilot dashboard to accept or decline.</p>
+          <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;" />
+          <p style="font-size:12px;color:#94a3b8;">Or go to: <a href="${dashboardUrl}" style="color:#22c55e;">${dashboardUrl}</a></p>
+        </div>
+      `,
+    });
+    logger.info('Invite email sent', { to, websiteName });
+    return { sent: true, method: 'email' };
+  } catch (err) {
+    logger.error('Failed to send invite email', { to, error: (err as Error).message });
+    return { sent: false, method: 'email' };
+  }
+}
+
 export async function sendPasswordResetEmail(
   to: string,
   name: string,

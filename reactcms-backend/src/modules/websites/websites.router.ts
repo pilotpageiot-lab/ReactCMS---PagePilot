@@ -104,7 +104,7 @@ router.post(
   validate({ body: inviteMemberSchema }),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      created(res, await websitesService.inviteMember(req.websiteId!, req.body));
+      created(res, await websitesService.inviteMember(req.websiteId!, req.body, req.user!.id));
     } catch (err) { next(err); }
   },
 );

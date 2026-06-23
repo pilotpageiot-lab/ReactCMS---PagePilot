@@ -58,7 +58,7 @@ describe('inviteMember', () => {
   it('throws NotFoundError for unknown email', async () => {
     mockQuery.mockResolvedValueOnce({ rows: [] }); // user not found
     await expect(
-      websitesService.inviteMember('w1', { email: 'ghost@x.com', role: 'editor' }),
+      websitesService.inviteMember('w1', { email: 'ghost@x.com', role: 'editor' }, 'inviter-id'),
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 
@@ -67,7 +67,7 @@ describe('inviteMember', () => {
       .mockResolvedValueOnce({ rows: [{ id: 'u2' }] })  // user found
       .mockResolvedValueOnce({ rows: [{ id: 'existing' }] }); // already member
     await expect(
-      websitesService.inviteMember('w1', { email: 'member@x.com', role: 'editor' }),
+      websitesService.inviteMember('w1', { email: 'member@x.com', role: 'editor' }, 'inviter-id'),
     ).rejects.toMatchObject({ code: 'CONFLICT' });
   });
 });

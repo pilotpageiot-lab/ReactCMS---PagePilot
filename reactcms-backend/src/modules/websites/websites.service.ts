@@ -1,6 +1,7 @@
 import { pool } from '../../lib/db/pool';
 import { ConflictError, ForbiddenError, NotFoundError } from '../../utils/errors';
 import { getPlanLimits } from '../../lib/planLimits';
+import { sendInviteEmail } from '../../lib/email';
 import type { CreateWebsiteDto, UpdateWebsiteDto, InviteMemberDto } from './websites.schema';
 
 export async function listWebsites(userId: string) {
@@ -111,9 +112,9 @@ export async function listMembers(websiteId: string) {
   return { data: rows };
 }
 
-export async function inviteMember(websiteId: string, dto: InviteMemberDto) {
-  const { rows: userRows } = await pool.query(
-    'SELECT id FROM users WHERE email = $1',
+export async function inviteMember(websiteId: string, dto: InviteMemberDto, inviterId: string) {
+  const { rows: userRows } = await pool.query<{ id: string; name: string }>(
+    'SELECT id, name FROM users WHERE email = $1',
     [dto.email],
   );
   const user = userRows[0];
@@ -130,6 +131,18 @@ export async function inviteMember(websiteId: string, dto: InviteMemberDto) {
      VALUES ($1, $2, $3) RETURNING *`,
     [websiteId, user.id, dto.role],
   );
+
+  const { rows: metaRows } = await pool.query<{ website_name: string; inviter_name: string }>(
+    `SELECT w.name AS website_name, u.name AS inviter_name
+     FROM websites w JOIN users u ON u.id = $2
+     WHERE w.id = $1`,
+    [websiteId, inviterId],
+  );
+  const meta = metaRows[0];
+  if (meta) {
+    sendInviteEmail(dto.email, user.name, meta.website_name, dto.role, meta.inviter_name);
+  }
+
   return { invited: true, email: dto.email, role: dto.role, invited_at: rows[0].invited_at };
 }
 
