@@ -64,8 +64,14 @@ export function createApp() {
   app.use('/v1/websites', websitesRouter);
   app.use('/v1/websites/:id/content', contentRouter);
   app.use('/v1/websites/:id/keys', apiKeysRouter);
-  // Preview page for PagePilot inline editing — must come before static SDK mount
-  app.use('/sdk/v1/preview', cors({ origin: '*' }), previewRouter);
+  // Preview page for PagePilot inline editing — must come before static SDK mount.
+  // Helmet's CSP blocks framing by default, so we disable it for this route
+  // and set a permissive CSP directly in the preview handler.
+  app.use('/sdk/v1/preview',
+    helmet({ contentSecurityPolicy: false, frameguard: false }),
+    cors({ origin: '*' }),
+    previewRouter,
+  );
 
   // Serve the SDK JavaScript bundle (sdk.js) as a static file.
   // Must come before the sdkRouter so /sdk/v1/sdk.js is served without API key auth.
