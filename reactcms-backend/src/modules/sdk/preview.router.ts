@@ -80,6 +80,9 @@ async function buildMirrorHtml(siteUrl: string, apiUrl: string): Promise<string>
 
   let html = await res.text();
 
+  // Remove the original SDK script tag to avoid conflicts (wrong API URL, duplicate init)
+  html = html.replace(/<script[^>]*data-key\s*=\s*["'][^"']*["'][^>]*>[\s\S]*?<\/script>/gi, '<!-- original SDK removed by PagePilot -->');
+
   // Make relative URLs absolute so assets load correctly inside the iframe
   const base = new URL('/', siteUrl).href;
   if (!html.includes('<base')) {

@@ -652,14 +652,50 @@
       this._injectStyles();
 
       var self = this;
-      var els = document.querySelectorAll('[' + A_KEY + ']');
       var editableCount = 0;
+      var usedKeys = {};
+      var TEXT_TAGS = 'h1,h2,h3,h4,h5,h6,p,span,a,button,label,li,td,th,blockquote,figcaption,small,strong,em,b,i,u,legend,dt,dd,summary,caption';
+      var SKIP = { script:1, style:1, noscript:1, svg:1, head:1, template:1, nav:1 };
 
-      for (var i = 0; i < els.length; i++) {
-        var el = els[i];
+      // Phase 1: elements with data-cms (have known keys)
+      var tagged = document.querySelectorAll('[' + A_KEY + ']');
+      for (var i = 0; i < tagged.length; i++) {
+        var el = tagged[i];
         if (!self._isEditable(el)) continue;
+        usedKeys[el.getAttribute(A_KEY)] = 1;
         editableCount++;
         self._attachHandlers(el);
+      }
+
+      // Phase 2: all text-bearing elements without data-cms
+      var all = document.querySelectorAll(TEXT_TAGS);
+      for (var j = 0; j < all.length; j++) {
+        var tel = all[j];
+        if (tel.hasAttribute(A_KEY)) continue;
+        if (!self._isEditable(tel)) continue;
+
+        // Skip if inside a skipped ancestor
+        var skip = false;
+        var p = tel.parentElement;
+        while (p) { if (SKIP[p.tagName.toLowerCase()]) { skip = true; break; } p = p.parentElement; }
+        if (skip) continue;
+
+        var text = (tel.textContent || '').trim();
+        if (text.length < 2) continue;
+
+        // Skip if a child text element also qualifies (prefer leaf nodes)
+        if (tel.querySelector(TEXT_TAGS) && tel.querySelector(TEXT_TAGS).textContent.trim().length >= 2) continue;
+
+        // Auto-generate a key
+        var tag = tel.tagName.toLowerCase();
+        var slug = text.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').slice(0, 50);
+        var key = slug.length >= 3 ? (tag + '-' + slug) : (tag + '-auto-' + j);
+        if (usedKeys[key]) { var s = 2; while (usedKeys[key + '-' + s]) s++; key = key + '-' + s; }
+        usedKeys[key] = 1;
+
+        tel.setAttribute(A_KEY, key);
+        editableCount++;
+        self._attachHandlers(tel);
       }
 
       if (window.parent !== window) {
