@@ -51,7 +51,7 @@ router.get('/:websiteId', async (req: Request, res: Response, next: NextFunction
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Content-Security-Policy',
-      "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; " +
+      "default-src *; script-src * 'unsafe-inline'; style-src * 'unsafe-inline'; " +
       "img-src * data:; connect-src *; font-src * data:; frame-ancestors *");
     res.send(html);
   } catch (err) { next(err); }
