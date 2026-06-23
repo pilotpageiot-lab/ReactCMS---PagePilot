@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Trash2, Globe, EyeOff, Clock, FileText, Scan, ArrowLeft, AlertTriangle, Zap, MousePointerClick, Code2 } from 'lucide-react';
+import { Plus, Search, Trash2, Globe, EyeOff, Clock, FileText, Scan, ArrowLeft, AlertTriangle, MousePointerClick } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { clsx } from 'clsx';
 import { Button } from '@/components/ui/Button';
