@@ -1,5 +1,6 @@
 import { pool } from '../../lib/db/pool';
 import { ConflictError, ForbiddenError, NotFoundError } from '../../utils/errors';
+import { getPlanLimits } from '../../lib/planLimits';
 import type { CreateWebsiteDto, UpdateWebsiteDto, InviteMemberDto } from './websites.schema';
 
 export async function listWebsites(userId: string) {
@@ -18,11 +19,28 @@ export async function listWebsites(userId: string) {
 }
 
 export async function createWebsite(userId: string, dto: CreateWebsiteDto) {
+  const plan = dto.plan ?? 'free';
+  const limits = getPlanLimits(plan);
+
+  const { rows: countRows } = await pool.query<{ count: string }>(
+    'SELECT COUNT(*) AS count FROM websites WHERE owner_id = $1',
+    [userId],
+  );
+  const currentCount = parseInt(countRows[0]?.count ?? '0', 10);
+
+  if (currentCount >= limits.maxWebsites) {
+    const label = plan.charAt(0).toUpperCase() + plan.slice(1);
+    throw new ForbiddenError(
+      `${label} plan allows ${limits.maxWebsites} website${limits.maxWebsites !== 1 ? 's' : ''}. ` +
+      `Upgrade your plan to add more.`,
+    );
+  }
+
   const { rows } = await pool.query(
     `INSERT INTO websites (owner_id, name, slug, plan)
      VALUES ($1, $2, $3, $4)
      RETURNING *`,
-    [userId, dto.name, dto.slug, dto.plan],
+    [userId, dto.name, dto.slug, plan],
   );
   return rows[0];
 }

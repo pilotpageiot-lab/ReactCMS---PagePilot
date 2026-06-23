@@ -1,6 +1,6 @@
 import { useState, FormEvent } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useAuthStore } from '@/store/auth';
@@ -8,7 +8,7 @@ import { authApi } from '@/api/auth';
 import { ApiError } from '@/lib/api-client';
 import { clsx } from 'clsx';
 
-type Tab = 'login' | 'register';
+type Tab = 'login' | 'register' | 'reset';
 
 export function LoginPage() {
   const { isAuthenticated, setUser } = useAuthStore();
@@ -17,33 +17,47 @@ export function LoginPage() {
   const [tab, setTab] = useState<Tab>('login');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
-  // Form state
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   if (isAuthenticated) return <Navigate to="/dashboard" replace />;
+
+  const switchTab = (t: Tab) => { setTab(t); setError(''); setSuccess(''); };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
     setLoading(true);
 
     try {
-      const result =
-        tab === 'login'
-          ? await authApi.login(email, password)
-          : await authApi.register(name, email, password);
-
-      setUser(result.user);
-      navigate('/dashboard', { replace: true });
-    } catch (err) {
-      if (err instanceof ApiError) {
-        setError(err.message);
+      if (tab === 'reset') {
+        if (newPassword !== confirmPassword) {
+          setError('Passwords do not match');
+          setLoading(false);
+          return;
+        }
+        await authApi.changePassword(email, password, newPassword);
+        setSuccess('Password changed! You can now sign in.');
+        setPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+        setTimeout(() => switchTab('login'), 1500);
       } else {
-        setError('Something went wrong. Please try again.');
+        const result =
+          tab === 'login'
+            ? await authApi.login(email, password)
+            : await authApi.register(name, email, password);
+        setUser(result.user);
+        navigate('/dashboard', { replace: true });
       }
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -55,26 +69,30 @@ export function LoginPage() {
         {/* Brand */}
         <div className="flex items-center justify-center gap-2.5 mb-8">
           <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center shadow-sm">
-            <span className="text-white text-sm font-bold">RC</span>
+            <span className="text-white text-sm font-bold">PP</span>
           </div>
-          <span className="text-xl font-semibold text-gray-900">ReactCMS</span>
+          <span className="text-xl font-semibold text-gray-900">PagePilot</span>
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
           {/* Tabs */}
           <div className="flex border-b border-gray-100">
-            {(['login', 'register'] as Tab[]).map((t) => (
+            {([
+              { id: 'login' as Tab, label: 'Sign in' },
+              { id: 'register' as Tab, label: 'Create account' },
+              { id: 'reset' as Tab, label: 'Reset password' },
+            ]).map(({ id, label }) => (
               <button
-                key={t}
-                onClick={() => { setTab(t); setError(''); }}
+                key={id}
+                onClick={() => switchTab(id)}
                 className={clsx(
-                  'flex-1 py-3 text-sm font-medium transition-colors',
-                  tab === t
+                  'flex-1 py-3 text-xs sm:text-sm font-medium transition-colors',
+                  tab === id
                     ? 'text-gray-900 border-b-2 border-indigo-600 -mb-px'
                     : 'text-gray-500 hover:text-gray-700',
                 )}
               >
-                {t === 'login' ? 'Sign in' : 'Create account'}
+                {label}
               </button>
             ))}
           </div>
@@ -99,12 +117,12 @@ export function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               required
-              autoFocus={tab === 'login'}
+              autoFocus={tab === 'login' || tab === 'reset'}
               autoComplete={tab === 'login' ? 'username' : 'email'}
             />
 
             <Input
-              label="Password"
+              label={tab === 'reset' ? 'Current password' : 'Password'}
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -114,10 +132,41 @@ export function LoginPage() {
               autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
             />
 
+            {tab === 'reset' && (
+              <>
+                <Input
+                  label="New password"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="At least 8 characters"
+                  required
+                  minLength={8}
+                  autoComplete="new-password"
+                />
+                <Input
+                  label="Confirm new password"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Repeat new password"
+                  required
+                  minLength={8}
+                />
+              </>
+            )}
+
             {error && (
               <div className="flex items-start gap-2 p-3 bg-red-50 rounded-lg text-sm text-red-700">
                 <AlertCircle size={15} className="shrink-0 mt-0.5" />
                 {error}
+              </div>
+            )}
+
+            {success && (
+              <div className="flex items-start gap-2 p-3 bg-emerald-50 rounded-lg text-sm text-emerald-700">
+                <CheckCircle size={15} className="shrink-0 mt-0.5" />
+                {success}
               </div>
             )}
 
@@ -128,7 +177,7 @@ export function LoginPage() {
               loading={loading}
               className="w-full mt-1"
             >
-              {tab === 'login' ? 'Sign in' : 'Create account'}
+              {tab === 'login' ? 'Sign in' : tab === 'register' ? 'Create account' : 'Reset password'}
             </Button>
           </form>
         </div>

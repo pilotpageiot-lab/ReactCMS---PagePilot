@@ -25,4 +25,13 @@ export const authApi = {
   },
 
   me: (): Promise<User> => client.get<User>('/v1/auth/me'),
+
+  changePassword: (email: string, oldPassword: string, newPassword: string): Promise<{ message: string }> =>
+    client.post('/v1/auth/change-password', { email, old_password: oldPassword, new_password: newPassword }),
+
+  updatePassword: (oldPassword: string, newPassword: string): Promise<{ message: string }> =>
+    client.patch('/v1/auth/password', { old_password: oldPassword, new_password: newPassword }),
+
+  planUsage: (): Promise<{ plan: string; websites_used: number; websites_limit: number; history_days: number }> =>
+    client.get('/v1/auth/plan-usage'),
 };

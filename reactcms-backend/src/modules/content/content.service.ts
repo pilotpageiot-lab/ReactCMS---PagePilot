@@ -2,6 +2,7 @@ import { pool, withTransaction, setTenantContext, tenantQuery } from '../../lib/
 import { NotFoundError } from '../../utils/errors';
 import { invalidateKey } from '../../lib/contentCache';
 import { sanitizeHtml } from '../../utils/sanitize';
+import { getPlanLimits } from '../../lib/planLimits';
 import type { UpsertContentDto, ListContentQuery, PublishContentDto } from './content.schema';
 
 export async function listContent(websiteId: string, query: ListContentQuery) {
@@ -129,11 +130,19 @@ export async function listVersions(websiteId: string, key: string) {
   const item = itemRows[0] as any;
   if (!item) throw new NotFoundError(`Content key "${key}"`);
 
+  // Filter history by plan's retention period
+  const { rows: wsRows } = await pool.query<{ plan: string }>(
+    'SELECT plan FROM websites WHERE id = $1', [websiteId],
+  );
+  const plan = wsRows[0]?.plan ?? 'free';
+  const { historyDays } = getPlanLimits(plan);
+
   const { rows } = await pool.query(
     `SELECT cv.version, cv.value, cv.metadata, cv.created_at, u.name AS changed_by
      FROM content_versions cv
      LEFT JOIN users u ON u.id = cv.changed_by
-     WHERE cv.content_item_id = $1 ORDER BY cv.version DESC`,
+     WHERE cv.content_item_id = $1 AND cv.created_at > now() - interval '${historyDays} days'
+     ORDER BY cv.version DESC`,
     [item.id],
   );
   return { data: rows };

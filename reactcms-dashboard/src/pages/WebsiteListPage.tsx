@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { websitesApi } from '@/api/websites';
+import { authApi } from '@/api/auth';
 import { ApiError } from '@/lib/api-client';
 import { formatRelative } from '@/lib/date';
 import { clsx } from 'clsx';
@@ -51,6 +52,13 @@ export function WebsiteListPage() {
     queryFn: () => websitesApi.list(),
   });
 
+  const { data: usage } = useQuery({
+    queryKey: ['plan-usage'],
+    queryFn: () => authApi.planUsage(),
+  });
+
+  const atLimit = usage ? (usage.websites_limit !== -1 && usage.websites_used >= usage.websites_limit) : false;
+
   const createMutation = useMutation({
     mutationFn: (payload: { name: string; slug: string; plan: string }) =>
       websitesApi.create(payload),
@@ -82,16 +90,27 @@ export function WebsiteListPage() {
     <div>
       <PageHeader
         title="Websites"
-        description={`${websites.length} website${websites.length !== 1 ? 's' : ''} in your account`}
+        description={
+          usage
+            ? `${usage.websites_used}/${usage.websites_limit === -1 ? '∞' : usage.websites_limit} websites · ${usage.plan} plan`
+            : `${websites.length} website${websites.length !== 1 ? 's' : ''}`
+        }
         action={
-          <Button
-            variant="primary"
-            size="sm"
-            icon={<Plus size={14} />}
-            onClick={() => setCreateOpen(true)}
-          >
-            New website
-          </Button>
+          <div className="flex items-center gap-2">
+            {atLimit && (
+              <span className="text-xs text-amber-500 font-medium">Plan limit reached</span>
+            )}
+            <Button
+              variant="primary"
+              size="sm"
+              icon={<Plus size={14} />}
+              onClick={() => setCreateOpen(true)}
+              disabled={atLimit}
+              title={atLimit ? `${usage?.plan} plan allows ${usage?.websites_limit} website(s). Upgrade for more.` : undefined}
+            >
+              New website
+            </Button>
+          </div>
         }
       />
 

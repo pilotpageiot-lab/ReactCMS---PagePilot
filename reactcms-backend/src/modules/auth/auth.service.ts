@@ -8,6 +8,7 @@ import {
 import { hashPassword, verifyPassword } from '../../utils/hash';
 import { ConflictError, UnauthorizedError, NotFoundError } from '../../utils/errors';
 import { config } from '../../config';
+import { getPlanLimits } from '../../lib/planLimits';
 import type { RegisterDto, LoginDto } from './auth.schema';
 
 interface UserRow {
@@ -90,4 +91,46 @@ export async function getMe(userId: string) {
   const user = rows[0];
   if (!user) throw new NotFoundError('User');
   return { id: user.id, email: user.email, name: user.name, role: user.role, created_at: user.created_at };
+}
+
+export async function changePassword(email: string, oldPassword: string, newPassword: string) {
+  const { rows } = await pool.query<UserRow>(
+    'SELECT id, password_hash FROM users WHERE email = $1', [email],
+  );
+  const user = rows[0];
+  if (!user) throw new UnauthorizedError('Invalid credentials');
+  const valid = await verifyPassword(oldPassword, user.password_hash);
+  if (!valid) throw new UnauthorizedError('Invalid credentials');
+  const newHash = await hashPassword(newPassword);
+  await pool.query('UPDATE users SET password_hash = $1, updated_at = now() WHERE id = $2', [newHash, user.id]);
+}
+
+export async function changePasswordAuth(userId: string, oldPassword: string, newPassword: string) {
+  const { rows } = await pool.query<UserRow>(
+    'SELECT id, password_hash FROM users WHERE id = $1', [userId],
+  );
+  const user = rows[0];
+  if (!user) throw new NotFoundError('User');
+  const valid = await verifyPassword(oldPassword, user.password_hash);
+  if (!valid) throw new UnauthorizedError('Current password is incorrect');
+  const newHash = await hashPassword(newPassword);
+  await pool.query('UPDATE users SET password_hash = $1, updated_at = now() WHERE id = $2', [newHash, user.id]);
+}
+
+export async function getPlanUsage(userId: string) {
+  const { rows } = await pool.query<{ count: string; plan: string }>(
+    `SELECT COUNT(*) AS count,
+       COALESCE((SELECT plan FROM websites WHERE owner_id = $1 LIMIT 1), 'free') AS plan
+     FROM websites WHERE owner_id = $1`,
+    [userId],
+  );
+  const count = parseInt(rows[0]?.count ?? '0', 10);
+  const plan = rows[0]?.plan ?? 'free';
+  const limits = getPlanLimits(plan);
+  return {
+    plan,
+    websites_used: count,
+    websites_limit: limits.maxWebsites === Infinity ? -1 : limits.maxWebsites,
+    history_days: limits.historyDays,
+  };
 }
