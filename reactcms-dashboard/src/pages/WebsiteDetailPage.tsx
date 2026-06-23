@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, Link, Navigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronRight, FileText, Key, Users, Settings } from 'lucide-react';
+import { ChevronRight, FileText, Key, Users, Settings, Pencil } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Badge } from '@/components/ui/Badge';
 import { websitesApi } from '@/api/websites';
@@ -59,6 +59,17 @@ export function WebsiteDetailPage() {
         }
         action={
           <div className="flex items-center gap-2">
+            <Link
+              to={`/websites/${id}/pagepilot`}
+              className="inline-flex items-center gap-1.5 h-7 px-2.5 text-xs font-semibold rounded-lg transition-colors"
+              style={{
+                background: 'var(--color-green, #22c55e)',
+                color: '#0b1220',
+              }}
+            >
+              <Pencil size={12} />
+              Edit on site
+            </Link>
             <Badge variant={website.is_active ? 'success' : 'default'}>
               {website.is_active ? 'Active' : 'Inactive'}
             </Badge>

@@ -623,13 +623,224 @@
       var p = cfg.autoDiscover
         ? cms.discover().then(function () { return cms.load(); })
         : cms.load();
-      p.then(function () { cms.observe(); }).catch(function (e) { log('error', 'init failed', e); });
+      p.then(function () { cms.observe(); })
+       .then(function () {
+         if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
+           window.parent.postMessage({ type: 'pagepilot:ready' }, '*');
+         }
+       })
+       .catch(function (e) { log('error', 'init failed', e); });
     }
 
     document.readyState === 'loading'
       ? document.addEventListener('DOMContentLoaded', run, { once: true })
       : run();
   })();
+
+  /* ─── PagePilot V2 — inline edit mode ────────────────────────────────────── */
+
+  var PagePilot = {
+    _active: false,
+    _editing: null,   // currently editing element
+    _toolbar: null,
+    _styleEl: null,
+    _handlers: [],     // stored for cleanup
+
+    activate: function () {
+      if (this._active) return;
+      this._active = true;
+      this._injectStyles();
+
+      var self = this;
+      var els = document.querySelectorAll('[' + A_KEY + ']');
+      var editableCount = 0;
+
+      for (var i = 0; i < els.length; i++) {
+        var el = els[i];
+        if (!self._isEditable(el)) continue;
+        editableCount++;
+        self._attachHandlers(el);
+      }
+
+      if (window.parent !== window) {
+        window.parent.postMessage({ type: 'pagepilot:elements', count: editableCount }, '*');
+      }
+      log('info', 'PagePilot activated — ' + editableCount + ' editable elements');
+    },
+
+    deactivate: function () {
+      if (!this._active) return;
+      if (this._editing) this._cancelEdit();
+      for (var i = 0; i < this._handlers.length; i++) {
+        var h = this._handlers[i];
+        h.el.removeEventListener('mouseenter', h.enter);
+        h.el.removeEventListener('mouseleave', h.leave);
+        h.el.removeEventListener('click', h.click);
+        h.el.classList.remove('pp-hover', 'pp-editing', 'pp-saved');
+      }
+      this._handlers = [];
+      if (this._toolbar && this._toolbar.parentNode) this._toolbar.parentNode.removeChild(this._toolbar);
+      this._toolbar = null;
+      if (this._styleEl && this._styleEl.parentNode) this._styleEl.parentNode.removeChild(this._styleEl);
+      this._styleEl = null;
+      this._active = false;
+      log('info', 'PagePilot deactivated');
+    },
+
+    _isEditable: function (el) {
+      var tag = el.tagName.toLowerCase();
+      if (tag === 'img' || tag === 'video' || tag === 'audio' || tag === 'iframe') return false;
+      var mode = el.getAttribute(A_TYPE);
+      if (mode === 'src' || mode === 'href' || mode === 'attr' || mode === 'value') return false;
+      return true;
+    },
+
+    _isRichtext: function (el) {
+      var mode = el.getAttribute(A_TYPE);
+      if (mode === 'html') return true;
+      var children = el.children;
+      for (var i = 0; i < children.length; i++) {
+        var t = children[i].tagName.toLowerCase();
+        if (t === 'strong' || t === 'em' || t === 'a' || t === 'b' || t === 'i' || t === 'u' || t === 'br' || t === 'span') return true;
+      }
+      return false;
+    },
+
+    _attachHandlers: function (el) {
+      var self = this;
+      function enter() { if (self._editing !== el) el.classList.add('pp-hover'); }
+      function leave() { el.classList.remove('pp-hover'); }
+      function click(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        self._startEdit(el);
+      }
+      el.addEventListener('mouseenter', enter);
+      el.addEventListener('mouseleave', leave);
+      el.addEventListener('click', click);
+      this._handlers.push({ el: el, enter: enter, leave: leave, click: click });
+    },
+
+    _startEdit: function (el) {
+      if (this._editing) this._cancelEdit();
+
+      var isRich = this._isRichtext(el);
+      el._ppOriginal = isRich ? el.innerHTML : el.textContent;
+      el._ppRich = isRich;
+      el.classList.remove('pp-hover');
+      el.classList.add('pp-editing');
+      el.contentEditable = 'true';
+      el.focus();
+      this._editing = el;
+      this._showToolbar(el);
+    },
+
+    _saveEdit: function () {
+      var el = this._editing;
+      if (!el) return;
+      var isRich = el._ppRich;
+      var newVal = isRich ? el.innerHTML : el.textContent;
+      var key = el.getAttribute(A_KEY);
+
+      el.contentEditable = 'false';
+      el.classList.remove('pp-editing');
+      el.classList.add('pp-saved');
+      setTimeout(function () { el.classList.remove('pp-saved'); }, 800);
+      this._hideToolbar();
+      this._editing = null;
+
+      if (newVal !== el._ppOriginal && window.parent !== window) {
+        window.parent.postMessage({
+          type: 'pagepilot:change',
+          key: key,
+          value: newVal,
+          content_type: isRich ? 'richtext' : 'text',
+          original: el._ppOriginal
+        }, '*');
+      }
+    },
+
+    _cancelEdit: function () {
+      var el = this._editing;
+      if (!el) return;
+      if (el._ppRich) { el.innerHTML = el._ppOriginal; }
+      else { el.textContent = el._ppOriginal; }
+      el.contentEditable = 'false';
+      el.classList.remove('pp-editing');
+      this._hideToolbar();
+      this._editing = null;
+    },
+
+    _showToolbar: function (el) {
+      if (this._toolbar) this._hideToolbar();
+
+      var bar = document.createElement('div');
+      bar.id = 'pp-toolbar';
+      bar.innerHTML =
+        '<button id="pp-save" style="background:#22c55e;color:#fff;border:none;padding:5px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:system-ui,sans-serif;">Save</button>' +
+        '<button id="pp-cancel" style="background:#334155;color:#cbd5e1;border:none;padding:5px 14px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;margin-left:6px;font-family:system-ui,sans-serif;">Cancel</button>';
+      document.body.appendChild(bar);
+      this._toolbar = bar;
+
+      var self = this;
+      document.getElementById('pp-save').addEventListener('click', function (e) { e.stopPropagation(); self._saveEdit(); });
+      document.getElementById('pp-cancel').addEventListener('click', function (e) { e.stopPropagation(); self._cancelEdit(); });
+
+      this._positionToolbar(el);
+      var reposition = function () { if (self._editing === el) self._positionToolbar(el); };
+      window.addEventListener('scroll', reposition, true);
+      window.addEventListener('resize', reposition);
+      bar._cleanup = function () {
+        window.removeEventListener('scroll', reposition, true);
+        window.removeEventListener('resize', reposition);
+      };
+    },
+
+    _positionToolbar: function (el) {
+      var bar = this._toolbar;
+      if (!bar) return;
+      var rect = el.getBoundingClientRect();
+      bar.style.position = 'fixed';
+      bar.style.top = Math.max(8, rect.top - 42) + 'px';
+      bar.style.left = rect.left + 'px';
+      bar.style.zIndex = '2147483647';
+    },
+
+    _hideToolbar: function () {
+      var bar = this._toolbar;
+      if (!bar) return;
+      if (bar._cleanup) bar._cleanup();
+      if (bar.parentNode) bar.parentNode.removeChild(bar);
+      this._toolbar = null;
+    },
+
+    _injectStyles: function () {
+      if (this._styleEl) return;
+      var s = document.createElement('style');
+      s.id = 'pp-styles';
+      s.textContent =
+        '[data-cms] { cursor: pointer !important; transition: outline 0.15s ease, box-shadow 0.15s ease; }' +
+        '[data-cms].pp-hover { outline: 2px dashed #22c55e; outline-offset: 3px; }' +
+        '[data-cms].pp-editing { outline: 2px solid #22c55e; outline-offset: 3px; box-shadow: 0 0 0 4px rgba(34,197,94,0.15); cursor: text !important; }' +
+        '[data-cms].pp-saved { animation: pp-flash 0.8s ease; }' +
+        '@keyframes pp-flash { 0%{background:rgba(34,197,94,0.2)} 100%{background:transparent} }' +
+        '#pp-toolbar { display:flex; align-items:center; padding:4px; background:#1e293b; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,0.4); }' +
+        '#pp-toolbar button:hover { opacity:0.85; }';
+      document.head.appendChild(s);
+      this._styleEl = s;
+    }
+  };
+
+  /* ─── PagePilot message listener ────────────────────────────────────────── */
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('message', function (event) {
+      var data = event.data;
+      if (!data || typeof data.type !== 'string') return;
+      if (data.type === 'pagepilot:init') PagePilot.activate();
+      if (data.type === 'pagepilot:deactivate') PagePilot.deactivate();
+    });
+  }
 
   return ReactCMS;
 });

@@ -11,6 +11,7 @@ import { websitesRouter } from './modules/websites/websites.router';
 import { contentRouter } from './modules/content/content.router';
 import { apiKeysRouter } from './modules/apikeys/apikeys.router';
 import { sdkRouter } from './modules/sdk/sdk.router';
+import { previewRouter } from './modules/sdk/preview.router';
 import { publicRouter } from './modules/public/public.router';
 
 export function createApp() {
@@ -63,6 +64,9 @@ export function createApp() {
   app.use('/v1/websites', websitesRouter);
   app.use('/v1/websites/:id/content', contentRouter);
   app.use('/v1/websites/:id/keys', apiKeysRouter);
+  // Preview page for PagePilot inline editing — must come before static SDK mount
+  app.use('/sdk/v1/preview', cors({ origin: '*' }), previewRouter);
+
   // Serve the SDK JavaScript bundle (sdk.js) as a static file.
   // Must come before the sdkRouter so /sdk/v1/sdk.js is served without API key auth.
   const sdkDistPath = path.resolve(__dirname, '../../reactcms-sdk/dist');
