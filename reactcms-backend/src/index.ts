@@ -20,9 +20,21 @@ async function bootstrap() {
     });
   });
 
+  // Scheduled publishing — check every 60 seconds
+  const { publishScheduledItems } = await import('./modules/content/content.service');
+  const schedulerInterval = setInterval(async () => {
+    try {
+      const count = await publishScheduledItems();
+      if (count > 0) logger.info(`Scheduler: published ${count} scheduled item(s)`);
+    } catch (err) {
+      logger.error('Scheduler error', { error: (err as Error).message });
+    }
+  }, 60_000);
+
   // ── Graceful shutdown ──────────────────────────────────
   async function shutdown(signal: string) {
     logger.info(`${signal} received — shutting down gracefully`);
+    clearInterval(schedulerInterval);
     server.close(async () => {
       await pool.end();
       await redis.quit();

@@ -14,6 +14,8 @@ export const updateWebsiteSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   custom_domain: z.string().url().nullable().optional(),
   is_active: z.boolean().optional(),
+  plan: z.enum(['free', 'pro', 'enterprise']).optional(),
+  webhook_url: z.string().url().nullable().optional(),
 });
 
 export const inviteMemberSchema = z.object({

@@ -73,6 +73,8 @@ export async function updateWebsite(websiteId: string, dto: UpdateWebsiteDto) {
   if (dto.name !== undefined) { fields.push(`name = $${i++}`); values.push(dto.name); }
   if (dto.custom_domain !== undefined) { fields.push(`custom_domain = $${i++}`); values.push(dto.custom_domain); }
   if (dto.is_active !== undefined) { fields.push(`is_active = $${i++}`); values.push(dto.is_active); }
+  if (dto.plan !== undefined) { fields.push(`plan = $${i++}`); values.push(dto.plan); }
+  if (dto.webhook_url !== undefined) { fields.push(`webhook_url = $${i++}`); values.push(dto.webhook_url); }
 
   if (fields.length === 0) throw new Error('No fields to update');
 

@@ -43,4 +43,10 @@ export const authApi = {
 
   resendVerification: (): Promise<{ message: string }> =>
     client.post('/v1/auth/resend-verification', {}),
+
+  forgotPassword: (email: string): Promise<{ message: string }> =>
+    client.post('/v1/auth/forgot-password', { email }),
+
+  resetPassword: (token: string, newPassword: string): Promise<{ message: string }> =>
+    client.post('/v1/auth/reset-password', { token, new_password: newPassword }),
 };

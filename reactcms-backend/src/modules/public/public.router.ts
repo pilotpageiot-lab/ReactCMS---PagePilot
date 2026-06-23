@@ -21,6 +21,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import { z } from 'zod';
+import { pool } from '../../lib/db/pool';
 import { validate } from '../../middleware/validate.middleware';
 import { requireAuth } from '../../middleware/auth.middleware';
 import { validatePublicApiKey } from './public.auth';
@@ -261,6 +262,46 @@ router.post(
         created: result.created,
         existing: result.existing,
       });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /public/content/search?website_id=xxx&q=text
+// Full-text search across published content items.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const searchQuerySchema = z.object({
+  website_id: z.string().uuid(),
+  q: z.string().min(1).max(200),
+  limit: z.coerce.number().min(1).max(50).default(20),
+});
+
+router.get(
+  '/content/search',
+  singleKeyRateLimit,
+  validate({ query: searchQuerySchema }),
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { website_id, q, limit: maxResults } = req.query as unknown as {
+        website_id: string; q: string; limit: number;
+      };
+
+      await assertWebsiteExists(website_id);
+
+      const { rows } = await pool.query(
+        `SELECT cms_key, content_type, value, metadata
+         FROM content_items
+         WHERE website_id = $1 AND is_published = true
+           AND (cms_key ILIKE $2 OR value ILIKE $2)
+         ORDER BY cms_key ASC LIMIT $3`,
+        [website_id, `%${q}%`, maxResults],
+      );
+
+      res.setHeader('Cache-Control', 'public, s-maxage=15, stale-while-revalidate=60');
+      ok(res, { website_id, query: q, results: rows, count: rows.length });
     } catch (err) {
       next(err);
     }

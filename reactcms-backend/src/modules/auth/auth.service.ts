@@ -11,7 +11,7 @@ import { hashPassword, verifyPassword } from '../../utils/hash';
 import { ConflictError, UnauthorizedError, NotFoundError, BadRequestError } from '../../utils/errors';
 import { config } from '../../config';
 import { getPlanLimits } from '../../lib/planLimits';
-import { sendVerificationEmail } from '../../lib/email';
+import { sendVerificationEmail, sendPasswordResetEmail } from '../../lib/email';
 import type { RegisterDto, LoginDto } from './auth.schema';
 
 interface UserRow {
@@ -177,6 +177,32 @@ export async function changePasswordAuth(userId: string, oldPassword: string, ne
   if (!valid) throw new UnauthorizedError('Current password is incorrect');
   const newHash = await hashPassword(newPassword);
   await pool.query('UPDATE users SET password_hash = $1, updated_at = now() WHERE id = $2', [newHash, user.id]);
+  await revokeAllUserTokens(userId);
+}
+
+const RESET_TOKEN_PREFIX = 'pw_reset:';
+const RESET_TOKEN_TTL = 60 * 60; // 1 hour
+
+export async function forgotPassword(email: string) {
+  const { rows } = await pool.query<UserRow>(
+    'SELECT id, name FROM users WHERE email = $1', [email],
+  );
+  // Always return success to prevent email enumeration
+  if (!rows[0]) return { sent: true };
+
+  const token = uuidv4();
+  await redis.set(RESET_TOKEN_PREFIX + token, rows[0].id, { EX: RESET_TOKEN_TTL });
+  const result = await sendPasswordResetEmail(email, rows[0].name, token);
+  return { sent: result.sent };
+}
+
+export async function resetPassword(token: string, newPassword: string) {
+  const userId = await redis.get(RESET_TOKEN_PREFIX + token);
+  if (!userId) throw new BadRequestError('Invalid or expired reset link');
+
+  const newHash = await hashPassword(newPassword);
+  await pool.query('UPDATE users SET password_hash = $1, updated_at = now() WHERE id = $2', [newHash, userId]);
+  await redis.del(RESET_TOKEN_PREFIX + token);
   await revokeAllUserTokens(userId);
 }
 

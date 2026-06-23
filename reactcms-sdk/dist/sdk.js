@@ -725,10 +725,15 @@
 
     _isEditable: function (el) {
       var tag = el.tagName.toLowerCase();
-      if (tag === 'img' || tag === 'video' || tag === 'audio' || tag === 'iframe') return false;
+      if (tag === 'img') return true;
+      if (tag === 'video' || tag === 'audio' || tag === 'iframe') return false;
       var mode = el.getAttribute(A_TYPE);
-      if (mode === 'src' || mode === 'href' || mode === 'attr' || mode === 'value') return false;
+      if (mode === 'href' || mode === 'attr' || mode === 'value') return false;
       return true;
+    },
+
+    _isImage: function (el) {
+      return el.tagName.toLowerCase() === 'img' || el.getAttribute(A_TYPE) === 'src';
     },
 
     _isRichtext: function (el) {
@@ -760,9 +765,21 @@
     _startEdit: function (el) {
       if (this._editing) this._cancelEdit();
 
+      if (this._isImage(el)) {
+        el._ppOriginal = el.getAttribute('src') || '';
+        el._ppRich = false;
+        el._ppImage = true;
+        el.classList.remove('pp-hover');
+        el.classList.add('pp-editing');
+        this._editing = el;
+        this._showImageToolbar(el);
+        return;
+      }
+
       var isRich = this._isRichtext(el);
       el._ppOriginal = isRich ? el.innerHTML : el.textContent;
       el._ppRich = isRich;
+      el._ppImage = false;
       el.classList.remove('pp-hover');
       el.classList.add('pp-editing');
       el.contentEditable = 'true';
@@ -771,14 +788,23 @@
       this._showToolbar(el);
     },
 
-    _saveEdit: function () {
+    _saveEdit: function (overrideValue) {
       var el = this._editing;
       if (!el) return;
-      var isRich = el._ppRich;
-      var newVal = isRich ? el.innerHTML : el.textContent;
       var key = el.getAttribute(A_KEY);
+      var newVal;
+      var contentType;
 
-      el.contentEditable = 'false';
+      if (el._ppImage) {
+        newVal = overrideValue || el.getAttribute('src') || '';
+        contentType = 'image';
+        if (overrideValue) el.setAttribute('src', overrideValue);
+      } else {
+        newVal = el._ppRich ? el.innerHTML : el.textContent;
+        contentType = el._ppRich ? 'richtext' : 'text';
+        el.contentEditable = 'false';
+      }
+
       el.classList.remove('pp-editing');
       el.classList.add('pp-saved');
       setTimeout(function () { el.classList.remove('pp-saved'); }, 800);
@@ -790,7 +816,7 @@
           type: 'pagepilot:change',
           key: key,
           value: newVal,
-          content_type: isRich ? 'richtext' : 'text',
+          content_type: contentType,
           original: el._ppOriginal
         }, '*');
       }
@@ -799,9 +825,15 @@
     _cancelEdit: function () {
       var el = this._editing;
       if (!el) return;
-      if (el._ppRich) { el.innerHTML = el._ppOriginal; }
-      else { el.textContent = el._ppOriginal; }
-      el.contentEditable = 'false';
+      if (el._ppImage) {
+        el.setAttribute('src', el._ppOriginal);
+      } else if (el._ppRich) {
+        el.innerHTML = el._ppOriginal;
+        el.contentEditable = 'false';
+      } else {
+        el.textContent = el._ppOriginal;
+        el.contentEditable = 'false';
+      }
       el.classList.remove('pp-editing');
       this._hideToolbar();
       this._editing = null;
@@ -823,6 +855,41 @@
       var self = this;
       document.getElementById('pp-save').addEventListener('click', function (e) { e.stopPropagation(); self._saveEdit(); });
       document.getElementById('pp-cancel').addEventListener('click', function (e) { e.stopPropagation(); self._cancelEdit(); });
+
+      this._positionToolbar(el);
+      var reposition = function () { if (self._editing === el) self._positionToolbar(el); };
+      window.addEventListener('scroll', reposition, true);
+      window.addEventListener('resize', reposition);
+      bar._cleanup = function () {
+        window.removeEventListener('scroll', reposition, true);
+        window.removeEventListener('resize', reposition);
+      };
+    },
+
+    _showImageToolbar: function (el) {
+      if (this._toolbar) this._hideToolbar();
+
+      var key = el.getAttribute(A_KEY) || '';
+      var currentSrc = el.getAttribute('src') || '';
+      var bar = document.createElement('div');
+      bar.id = 'pp-toolbar';
+      bar.innerHTML =
+        '<span style="font-size:10px;font-family:monospace;color:#22c55e;background:rgba(34,197,94,0.1);padding:3px 8px;border-radius:5px;border:1px solid rgba(34,197,94,0.25);margin-right:8px;white-space:nowrap;">' + key + '</span>' +
+        '<input id="pp-img-url" type="url" value="' + currentSrc.replace(/"/g, '&quot;') + '" placeholder="Image URL" style="flex:1;min-width:180px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:5px 10px;font-size:12px;color:#e2e8f0;font-family:system-ui,sans-serif;outline:none;" />' +
+        '<button id="pp-save" style="background:#22c55e;color:#0b1220;border:none;padding:5px 16px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:system-ui,sans-serif;margin-left:6px;">Save</button>' +
+        '<button id="pp-cancel" style="background:rgba(255,255,255,0.06);color:#94a3b8;border:1px solid rgba(255,255,255,0.1);padding:5px 14px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;margin-left:6px;font-family:system-ui,sans-serif;">Cancel</button>';
+      document.body.appendChild(bar);
+      this._toolbar = bar;
+
+      var self = this;
+      document.getElementById('pp-save').addEventListener('click', function (e) {
+        e.stopPropagation();
+        var url = document.getElementById('pp-img-url').value;
+        self._saveEdit(url);
+      });
+      document.getElementById('pp-cancel').addEventListener('click', function (e) { e.stopPropagation(); self._cancelEdit(); });
+      document.getElementById('pp-img-url').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('pp-save').click(); } });
+      document.getElementById('pp-img-url').focus();
 
       this._positionToolbar(el);
       var reposition = function () { if (self._editing === el) self._positionToolbar(el); };

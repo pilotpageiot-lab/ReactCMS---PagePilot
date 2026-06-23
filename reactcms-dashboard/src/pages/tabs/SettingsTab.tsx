@@ -2,6 +2,7 @@ import { useState, FormEvent } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { clsx } from 'clsx';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
@@ -9,20 +10,29 @@ import { websitesApi } from '@/api/websites';
 import { ApiError } from '@/lib/api-client';
 import type { Website } from '@/types';
 
+const PLANS = [
+  { id: 'free', label: 'Free', price: '$0/mo', desc: '1 website · 7-day history' },
+  { id: 'pro', label: 'Pro', price: '$9/mo', desc: '3 websites · 90-day history' },
+  { id: 'enterprise', label: 'Enterprise', price: '$49/mo', desc: 'Unlimited · 1-year history' },
+];
+
 export function SettingsTab({ website }: { website: Website }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [name, setName] = useState(website.name);
   const [domain, setDomain] = useState(website.custom_domain ?? '');
+  const [webhookUrl, setWebhookUrl] = useState(website.webhook_url ?? '');
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState('');
+  const [upgradingTo, setUpgradingTo] = useState<string | null>(null);
 
   const updateMutation = useMutation({
     mutationFn: () =>
       websitesApi.update(website.id, {
         name,
         custom_domain: domain || null,
-      }),
+        webhook_url: webhookUrl || null,
+      } as any),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['website', website.id] });
       toast.success('Settings saved');
@@ -38,6 +48,17 @@ export function SettingsTab({ website }: { website: Website }) {
       navigate('/websites');
     },
     onError: (err) => toast.error(err instanceof ApiError ? err.message : 'Delete failed'),
+  });
+
+  const upgradeMutation = useMutation({
+    mutationFn: (plan: string) => websitesApi.update(website.id, { plan } as any),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['website', website.id] });
+      queryClient.invalidateQueries({ queryKey: ['plan-usage'] });
+      setUpgradingTo(null);
+      toast.success('Plan updated');
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : 'Upgrade failed'),
   });
 
   const handleSave = (e: FormEvent) => {
@@ -64,6 +85,14 @@ export function SettingsTab({ website }: { website: Website }) {
             onChange={(e) => setDomain(e.target.value)}
             placeholder="https://cms.yourdomain.com"
             hint="Optional — leave blank to use your reactcms.io subdomain"
+          />
+          <Input
+            label="Webhook URL"
+            type="url"
+            value={webhookUrl}
+            onChange={(e) => setWebhookUrl(e.target.value)}
+            placeholder="https://example.com/webhook"
+            hint="Receives a POST request when content is published"
           />
           <div className="pt-1">
             <Button
@@ -94,6 +123,43 @@ export function SettingsTab({ website }: { website: Website }) {
           ))}
         </div>
       </section>
+
+      {/* Plan */}
+      {website.role === 'owner' && (
+        <section>
+          <h2 className="text-sm font-semibold text-gray-900 mb-4">Plan</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {PLANS.map((p) => {
+              const isCurrent = website.plan === p.id;
+              return (
+                <div
+                  key={p.id}
+                  className={clsx(
+                    'rounded-xl border p-4 transition-colors',
+                    isCurrent ? 'border-indigo-400 bg-indigo-50' : 'border-gray-200 bg-white',
+                  )}
+                >
+                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">{p.label}</div>
+                  <div className="text-lg font-bold text-gray-900 mb-0.5">{p.price}</div>
+                  <p className="text-xs text-gray-500 mb-3">{p.desc}</p>
+                  {isCurrent ? (
+                    <span className="text-xs font-semibold text-indigo-600">Current plan</span>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant={p.id === 'pro' ? 'primary' : 'secondary'}
+                      loading={upgradingTo === p.id && upgradeMutation.isPending}
+                      onClick={() => { setUpgradingTo(p.id); upgradeMutation.mutate(p.id); }}
+                    >
+                      {PLANS.findIndex((x) => x.id === p.id) > PLANS.findIndex((x) => x.id === website.plan) ? 'Upgrade' : 'Downgrade'}
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* Danger zone */}
       {website.role === 'owner' && (

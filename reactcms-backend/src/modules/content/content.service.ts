@@ -3,6 +3,7 @@ import { NotFoundError } from '../../utils/errors';
 import { invalidateKey } from '../../lib/contentCache';
 import { sanitizeHtml } from '../../utils/sanitize';
 import { getPlanLimits } from '../../lib/planLimits';
+import { fireWebhook } from '../../lib/webhook';
 import type { UpsertContentDto, ListContentQuery, PublishContentDto } from './content.schema';
 
 export async function listContent(websiteId: string, query: ListContentQuery) {
@@ -107,18 +108,43 @@ export async function deleteContent(websiteId: string, key: string) {
   if (!rowCount) throw new NotFoundError(`Content key "${key}"`);
 }
 
-export async function publishContent(websiteId: string, key: string, _dto: PublishContentDto) {
-  // SECURITY FIX: use tenantQuery
+export async function publishContent(websiteId: string, key: string, dto: PublishContentDto) {
+  if (dto.scheduled_at) {
+    const { rows } = await tenantQuery<any>(
+      websiteId,
+      `UPDATE content_items SET scheduled_at = $3
+       WHERE website_id = $1 AND cms_key = $2 RETURNING *`,
+      [websiteId, key, dto.scheduled_at],
+    );
+    if (!rows[0]) throw new NotFoundError(`Content key "${key}"`);
+    return rows[0];
+  }
+
   const { rows } = await tenantQuery<any>(
     websiteId,
-    `UPDATE content_items SET is_published = true, published_at = now()
+    `UPDATE content_items SET is_published = true, published_at = now(), scheduled_at = NULL
      WHERE website_id = $1 AND cms_key = $2 RETURNING *`,
     [websiteId, key],
   );
   const item = rows[0];
   if (!item) throw new NotFoundError(`Content key "${key}"`);
   await invalidateKey(websiteId, key);
+  fireWebhook(websiteId, 'content.published', { cms_key: key, value: item.value }).catch(() => {});
   return item;
+}
+
+export async function publishScheduledItems(): Promise<number> {
+  const { rows } = await pool.query<{ id: string; website_id: string; cms_key: string; value: string }>(
+    `UPDATE content_items
+     SET is_published = true, published_at = now(), scheduled_at = NULL
+     WHERE scheduled_at IS NOT NULL AND scheduled_at <= now() AND is_published = false
+     RETURNING id, website_id, cms_key, value`,
+  );
+  for (const item of rows) {
+    await invalidateKey(item.website_id, item.cms_key);
+    fireWebhook(item.website_id, 'content.scheduled_publish', { cms_key: item.cms_key, value: item.value }).catch(() => {});
+  }
+  return rows.length;
 }
 
 export async function listVersions(websiteId: string, key: string) {

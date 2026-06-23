@@ -12,6 +12,7 @@ export interface Website {
   name: string;
   slug: string;
   custom_domain: string | null;
+  webhook_url: string | null;
   plan: 'free' | 'pro' | 'enterprise';
   is_active: boolean;
   content_count: number;

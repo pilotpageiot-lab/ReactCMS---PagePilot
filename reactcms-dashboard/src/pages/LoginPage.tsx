@@ -22,8 +22,6 @@ export function LoginPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
 
   if (isAuthenticated) return <Navigate to="/dashboard" replace />;
 
@@ -37,17 +35,8 @@ export function LoginPage() {
 
     try {
       if (tab === 'reset') {
-        if (newPassword !== confirmPassword) {
-          setError('Passwords do not match');
-          setLoading(false);
-          return;
-        }
-        await authApi.changePassword(email, password, newPassword);
-        setSuccess('Password changed! You can now sign in.');
-        setPassword('');
-        setNewPassword('');
-        setConfirmPassword('');
-        setTimeout(() => switchTab('login'), 1500);
+        await authApi.forgotPassword(email);
+        setSuccess('If that email is registered, a reset link has been sent. Check your inbox.');
       } else if (tab === 'login') {
         const result = await authApi.login(email, password);
         setUser(result.user);
@@ -86,7 +75,7 @@ export function LoginPage() {
             {([
               { id: 'login' as Tab, label: 'Sign in' },
               { id: 'register' as Tab, label: 'Create account' },
-              { id: 'reset' as Tab, label: 'Reset password' },
+              { id: 'reset' as Tab, label: 'Forgot password' },
             ]).map(({ id, label }) => (
               <button
                 key={id}
@@ -127,39 +116,17 @@ export function LoginPage() {
               autoComplete={tab === 'login' ? 'username' : 'email'}
             />
 
-            <Input
-              label={tab === 'reset' ? 'Current password' : 'Password'}
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder={tab === 'register' ? 'At least 8 characters' : '••••••••'}
-              required
-              minLength={tab === 'register' ? 8 : undefined}
-              autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
-            />
-
-            {tab === 'reset' && (
-              <>
-                <Input
-                  label="New password"
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="At least 8 characters"
-                  required
-                  minLength={8}
-                  autoComplete="new-password"
-                />
-                <Input
-                  label="Confirm new password"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Repeat new password"
-                  required
-                  minLength={8}
-                />
-              </>
+            {tab !== 'reset' && (
+              <Input
+                label="Password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={tab === 'register' ? 'At least 8 characters' : '••••••••'}
+                required
+                minLength={tab === 'register' ? 8 : undefined}
+                autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
+              />
             )}
 
             {error && (
@@ -183,7 +150,7 @@ export function LoginPage() {
               loading={loading}
               className="w-full mt-1"
             >
-              {tab === 'login' ? 'Sign in' : tab === 'register' ? 'Create account' : 'Reset password'}
+              {tab === 'login' ? 'Sign in' : tab === 'register' ? 'Create account' : 'Send reset link'}
             </Button>
           </form>
         </div>

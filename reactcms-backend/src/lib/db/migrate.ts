@@ -125,6 +125,16 @@ const migrations: { name: string; sql: string }[] = [
     `,
   },
   {
+    name: '008_scheduled_at_and_webhooks',
+    sql: `
+      ALTER TABLE content_items ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMPTZ;
+      CREATE INDEX IF NOT EXISTS idx_content_scheduled ON content_items (scheduled_at)
+        WHERE scheduled_at IS NOT NULL AND is_published = false;
+
+      ALTER TABLE websites ADD COLUMN IF NOT EXISTS webhook_url TEXT;
+    `,
+  },
+  {
     name: '007_migrations_table',
     sql: `
       CREATE TABLE IF NOT EXISTS _migrations (

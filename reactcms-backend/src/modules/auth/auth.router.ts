@@ -129,6 +129,35 @@ router.get(
   },
 );
 
+// Request password reset email (unauthenticated)
+router.post(
+  '/forgot-password',
+  authRateLimit,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { email } = req.body as { email?: string };
+      if (!email) { res.status(400).json({ error: 'BAD_REQUEST', message: 'email required' }); return; }
+      const result = await authService.forgotPassword(email);
+      ok(res, { message: 'If that email is registered, a reset link has been sent.', sent: result.sent });
+    } catch (err) { next(err); }
+  },
+);
+
+// Reset password via emailed token (unauthenticated)
+router.post(
+  '/reset-password',
+  authRateLimit,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { token, new_password } = req.body as { token?: string; new_password?: string };
+      if (!token || !new_password) { res.status(400).json({ error: 'BAD_REQUEST', message: 'token and new_password required' }); return; }
+      if (new_password.length < 8) { res.status(400).json({ error: 'BAD_REQUEST', message: 'Password must be at least 8 characters' }); return; }
+      await authService.resetPassword(token, new_password);
+      ok(res, { message: 'Password has been reset. You can now sign in.' });
+    } catch (err) { next(err); }
+  },
+);
+
 // Verify email address via token
 router.post(
   '/verify-email',
