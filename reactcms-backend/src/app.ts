@@ -17,16 +17,20 @@ import { publicRouter } from './modules/public/public.router';
 export function createApp() {
   const app = express();
 
-  app.use(helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc:  ["'self'"],
-        styleSrc:   ["'self'", "'unsafe-inline'"],
-        imgSrc:     ["'self'", 'data:', 'https:'],
+  app.use((req, res, next) => {
+    // Skip Helmet for the preview route — it needs to be framed by the dashboard
+    if (req.path.startsWith('/sdk/v1/preview')) return next();
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc:  ["'self'"],
+          styleSrc:   ["'self'", "'unsafe-inline'"],
+          imgSrc:     ["'self'", 'data:', 'https:'],
+        },
       },
-    },
-  }));
+    })(req, res, next);
+  });
 
   // SECURITY FIX: set trust proxy to exact number of hops for your topology
   // 1 = single load balancer / reverse proxy in front of the app
@@ -65,13 +69,9 @@ export function createApp() {
   app.use('/v1/websites/:id/content', contentRouter);
   app.use('/v1/websites/:id/keys', apiKeysRouter);
   // Preview page for PagePilot inline editing — must come before static SDK mount.
-  // Helmet's CSP blocks framing by default, so we disable it for this route
-  // and set a permissive CSP directly in the preview handler.
-  app.use('/sdk/v1/preview',
-    helmet({ contentSecurityPolicy: false, frameguard: false }),
-    cors({ origin: '*' }),
-    previewRouter,
-  );
+  // Helmet is skipped for this path (see conditional above), and the preview handler
+  // sets its own permissive CSP with frame-ancestors *.
+  app.use('/sdk/v1/preview', cors({ origin: '*' }), previewRouter);
 
   // Serve the SDK JavaScript bundle (sdk.js) as a static file.
   // Must come before the sdkRouter so /sdk/v1/sdk.js is served without API key auth.
