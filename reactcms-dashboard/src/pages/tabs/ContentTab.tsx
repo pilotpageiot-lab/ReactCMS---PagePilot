@@ -10,7 +10,7 @@ import { Modal } from '@/components/ui/Modal';
 import { ValueEditor } from '@/components/editor/ValueEditor';
 import { LivePreview } from '@/components/editor/LivePreview';
 import { VersionHistory } from '@/components/editor/VersionHistory';
-import { ContentTypeIcon, contentTypeLabel } from '@/components/editor/ContentTypeIcon';
+import { contentTypeLabel } from '@/components/editor/ContentTypeIcon';
 import { ScanWebsiteModal } from '@/components/scan/ScanWebsiteModal';
 import { contentApi } from '@/api/content';
 import { ApiError } from '@/lib/api-client';
