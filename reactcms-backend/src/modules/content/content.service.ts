@@ -141,9 +141,9 @@ export async function listVersions(websiteId: string, key: string) {
     `SELECT cv.version, cv.value, cv.metadata, cv.created_at, u.name AS changed_by
      FROM content_versions cv
      LEFT JOIN users u ON u.id = cv.changed_by
-     WHERE cv.content_item_id = $1 AND cv.created_at > now() - interval '${historyDays} days'
+     WHERE cv.content_item_id = $1 AND cv.created_at > now() - make_interval(days => $2)
      ORDER BY cv.version DESC`,
-    [item.id],
+    [item.id, historyDays],
   );
   return { data: rows };
 }
