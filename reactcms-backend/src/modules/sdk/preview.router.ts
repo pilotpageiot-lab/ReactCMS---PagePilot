@@ -112,16 +112,16 @@ async function buildMirrorHtml(siteUrl: string, apiUrl: string): Promise<string>
     html = html.replace(/<head([^>]*)>/i, `<head$1>\n  <base href="${escapeHtml(base)}">`);
   }
 
-  // Inject SDK (async to not block rendering) + ready signal
+  // Inject SDK + ready signal (SDK must load BEFORE we send ready so its message listener is registered)
   const injection = `
-  <script src="${escapeHtml(apiUrl)}/sdk/v1/sdk.js" async><\/script>
   <script>
     (function(){
-      var sent=false;
-      function ready(){if(!sent&&window.parent!==window){sent=true;window.parent.postMessage({type:'pagepilot:ready'},'*')}}
-      document.addEventListener('DOMContentLoaded',ready);
-      if(document.readyState!=='loading')ready();
-      setTimeout(ready,2000);
+      var s=document.createElement('script');
+      s.src="${escapeHtml(apiUrl)}/sdk/v1/sdk.js";
+      s.onload=function(){
+        if(window.parent!==window) window.parent.postMessage({type:'pagepilot:ready'},'*');
+      };
+      document.head.appendChild(s);
     })();
   <\/script>
 `;
@@ -177,14 +177,14 @@ function buildFallbackHtml(
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${escapeHtml(website.name)} — Preview</title>
-  <script src="${escapeHtml(apiUrl)}/sdk/v1/sdk.js" async><\/script>
   <script>
     (function(){
-      var sent=false;
-      function ready(){if(!sent&&window.parent!==window){sent=true;window.parent.postMessage({type:'pagepilot:ready'},'*')}}
-      document.addEventListener('DOMContentLoaded',ready);
-      if(document.readyState!=='loading')ready();
-      setTimeout(ready,2000);
+      var s=document.createElement('script');
+      s.src="${escapeHtml(apiUrl)}/sdk/v1/sdk.js";
+      s.onload=function(){
+        if(window.parent!==window) window.parent.postMessage({type:'pagepilot:ready'},'*');
+      };
+      document.head.appendChild(s);
     })();
   <\/script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
