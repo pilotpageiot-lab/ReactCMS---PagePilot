@@ -1,11 +1,15 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { pool } from '../../lib/db/pool';
+import { redis } from '../../lib/redis';
 import { escapeHtml } from '../../utils/sanitize';
 import { verifyAccessToken } from '../../lib/jwt';
 import { config } from '../../config';
 import { BadRequestError, UnauthorizedError, NotFoundError, ForbiddenError, AppError } from '../../utils/errors';
 
 const router = Router();
+
+const MIRROR_CACHE_PREFIX = 'preview:mirror:';
+const MIRROR_CACHE_TTL = 300; // 5 minutes
 
 router.get('/:websiteId', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -23,28 +27,31 @@ router.get('/:websiteId', async (req: Request, res: Response, next: NextFunction
       throw new UnauthorizedError('Invalid or expired token');
     }
 
-    const { rows: memberRows } = await pool.query(
-      'SELECT role FROM website_members WHERE website_id = $1 AND user_id = $2',
+    // Single query: fetch website + check membership in one round-trip
+    const { rows } = await pool.query<{
+      name: string; slug: string; custom_domain: string | null; role: string | null;
+    }>(
+      `SELECT w.name, w.slug, w.custom_domain,
+              COALESCE(
+                (SELECT wm.role FROM website_members wm WHERE wm.website_id = w.id AND wm.user_id = $2),
+                CASE WHEN w.owner_id = $2 THEN 'owner' ELSE NULL END
+              ) AS role
+       FROM websites w WHERE w.id = $1 AND w.is_active = true`,
       [websiteId, userId],
     );
-    if (!memberRows[0]) throw new ForbiddenError('You are not a member of this website');
-
-    const { rows: websiteRows } = await pool.query(
-      'SELECT name, slug, custom_domain FROM websites WHERE id = $1 AND is_active = true',
-      [websiteId],
-    );
-    if (!websiteRows[0]) throw new NotFoundError('Website');
-    const website = websiteRows[0] as { name: string; slug: string; custom_domain: string | null };
+    if (!rows[0]) throw new NotFoundError('Website');
+    if (!rows[0].role) throw new ForbiddenError('You are not a member of this website');
+    const website = rows[0];
 
     const apiUrl = config.API_BASE_URL;
     let html: string;
 
     if (website.custom_domain) {
-      html = await buildMirrorHtml(website.custom_domain, apiUrl);
+      html = await getCachedMirror(websiteId, website.custom_domain, apiUrl);
     } else {
       const { rows: contentRows } = await pool.query(
         `SELECT cms_key, content_type, value FROM content_items
-         WHERE website_id = $1 ORDER BY cms_key`,
+         WHERE website_id = $1 ORDER BY cms_key LIMIT 500`,
         [websiteId],
       );
       html = buildFallbackHtml(apiUrl, website, contentRows as ContentRow[]);
@@ -59,14 +66,32 @@ router.get('/:websiteId', async (req: Request, res: Response, next: NextFunction
   } catch (err) { next(err); }
 });
 
-// ── Mirror mode: fetch the actual website and inject SDK ─────────────────────
+// ── Mirror mode with Redis cache ─────────────────────────────────────────────
+
+async function getCachedMirror(websiteId: string, siteUrl: string, apiUrl: string): Promise<string> {
+  const cacheKey = MIRROR_CACHE_PREFIX + websiteId;
+
+  // Try Redis cache first
+  try {
+    const cached = await redis.get(cacheKey);
+    if (cached) return cached;
+  } catch { /* miss */ }
+
+  // Fetch and transform
+  const html = await buildMirrorHtml(siteUrl, apiUrl);
+
+  // Cache for 5 minutes
+  redis.set(cacheKey, html, { EX: MIRROR_CACHE_TTL }).catch(() => {});
+
+  return html;
+}
 
 async function buildMirrorHtml(siteUrl: string, apiUrl: string): Promise<string> {
   let res: globalThis.Response;
   try {
     res = await fetch(siteUrl, {
       headers: { 'User-Agent': 'ReactCMS-PagePilot/1.0' },
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(10_000),
       redirect: 'follow',
     });
   } catch (err) {
@@ -80,30 +105,24 @@ async function buildMirrorHtml(siteUrl: string, apiUrl: string): Promise<string>
 
   let html = await res.text();
 
-  // Remove the original SDK script tag to avoid conflicts (wrong API URL, duplicate init)
   html = html.replace(/<script[^>]*data-key\s*=\s*["'][^"']*["'][^>]*>[\s\S]*?<\/script>/gi, '<!-- original SDK removed by PagePilot -->');
 
-  // Make relative URLs absolute so assets load correctly inside the iframe
   const base = new URL('/', siteUrl).href;
   if (!html.includes('<base')) {
     html = html.replace(/<head([^>]*)>/i, `<head$1>\n  <base href="${escapeHtml(base)}">`);
   }
 
-  // Inject the SDK script + PagePilot ready signal right before </body>
+  // Inject SDK (async to not block rendering) + ready signal
   const injection = `
-  <!-- PagePilot V2 — injected by ReactCMS -->
-  <script src="${escapeHtml(apiUrl)}/sdk/v1/sdk.js"><\/script>
+  <script src="${escapeHtml(apiUrl)}/sdk/v1/sdk.js" async><\/script>
   <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      if (window.parent !== window) {
-        window.parent.postMessage({ type: 'pagepilot:ready' }, '*');
-      }
-    });
-    if (document.readyState !== 'loading') {
-      if (window.parent !== window) {
-        window.parent.postMessage({ type: 'pagepilot:ready' }, '*');
-      }
-    }
+    (function(){
+      var sent=false;
+      function ready(){if(!sent&&window.parent!==window){sent=true;window.parent.postMessage({type:'pagepilot:ready'},'*')}}
+      document.addEventListener('DOMContentLoaded',ready);
+      if(document.readyState!=='loading')ready();
+      setTimeout(ready,2000);
+    })();
   <\/script>
 `;
 
@@ -113,13 +132,12 @@ async function buildMirrorHtml(siteUrl: string, apiUrl: string): Promise<string>
     html += injection;
   }
 
-  // Remove any existing X-Frame-Options or frame-busting scripts from the source
   html = html.replace(/<meta[^>]*http-equiv\s*=\s*["']?X-Frame-Options["']?[^>]*>/gi, '');
 
   return html;
 }
 
-// ── Fallback: render content items as a styled page ──────────────────────────
+// ── Fallback ─────────────────────────────────────────────────────────────────
 
 interface ContentRow {
   cms_key: string;
@@ -137,28 +155,16 @@ function buildFallbackHtml(
     const val = row.value ?? '';
 
     if (row.content_type === 'image') {
-      return `<div class="pp-item">
-        <span class="pp-label">${key}</span>
-        <img data-cms="${key}" src="${escapeHtml(val)}" alt="${key}" />
-      </div>`;
+      return `<div class="pp-item"><span class="pp-label">${key}</span><img data-cms="${key}" src="${escapeHtml(val)}" alt="${key}" /></div>`;
     }
     if (row.content_type === 'richtext') {
-      return `<div class="pp-item">
-        <span class="pp-label">${key}</span>
-        <div data-cms="${key}" data-cms-type="html">${val}</div>
-      </div>`;
+      return `<div class="pp-item"><span class="pp-label">${key}</span><div data-cms="${key}" data-cms-type="html">${val}</div></div>`;
     }
     if (row.content_type === 'json') {
-      return `<div class="pp-item">
-        <span class="pp-label">${key}</span>
-        <pre data-cms="${key}">${escapeHtml(val)}</pre>
-      </div>`;
+      return `<div class="pp-item"><span class="pp-label">${key}</span><pre data-cms="${key}">${escapeHtml(val)}</pre></div>`;
     }
     const tag = key.match(/^h[1-6]-/) ? key.slice(0, 2) : 'p';
-    return `<div class="pp-item">
-      <span class="pp-label">${key}</span>
-      <${tag} data-cms="${key}">${escapeHtml(val)}</${tag}>
-    </div>`;
+    return `<div class="pp-item"><span class="pp-label">${key}</span><${tag} data-cms="${key}">${escapeHtml(val)}</${tag}></div>`;
   }).join('\n');
 
   const empty = content.length === 0
@@ -171,39 +177,33 @@ function buildFallbackHtml(
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${escapeHtml(website.name)} — Preview</title>
-  <script src="${escapeHtml(apiUrl)}/sdk/v1/sdk.js"><\/script>
+  <script src="${escapeHtml(apiUrl)}/sdk/v1/sdk.js" async><\/script>
   <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      if (window.parent !== window) {
-        window.parent.postMessage({ type: 'pagepilot:ready' }, '*');
-      }
-    });
+    (function(){
+      var sent=false;
+      function ready(){if(!sent&&window.parent!==window){sent=true;window.parent.postMessage({type:'pagepilot:ready'},'*')}}
+      document.addEventListener('DOMContentLoaded',ready);
+      if(document.readyState!=='loading')ready();
+      setTimeout(ready,2000);
+    })();
   <\/script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: 'Inter', system-ui, sans-serif; line-height: 1.7;
-      color: #e2e8f0; background: #0b1220;
-      padding: 48px 24px 80px; max-width: 720px; margin: 0 auto;
-    }
-    .pp-header { margin-bottom: 48px; padding-bottom: 20px; border-bottom: 1px solid #1e293b; }
-    .pp-header h1 { font-size: 22px; font-weight: 700; color: #f1f5f9; }
-    .pp-header p  { font-size: 13px; color: #64748b; margin-top: 4px; }
-    .pp-item { margin-bottom: 28px; }
-    .pp-label {
-      display: inline-block; font-size: 10px; font-family: monospace;
-      color: #22c55e; background: rgba(34,197,94,0.08); padding: 2px 8px;
-      border-radius: 4px; margin-bottom: 6px; border: 1px solid rgba(34,197,94,0.2);
-    }
-    .pp-item h1 { font-size: 28px; font-weight: 700; color: #f1f5f9; }
-    .pp-item h2 { font-size: 22px; font-weight: 600; color: #f1f5f9; }
-    .pp-item h3 { font-size: 18px; font-weight: 600; color: #e2e8f0; }
-    .pp-item p  { font-size: 15px; color: #94a3b8; }
-    .pp-item pre { font-size: 12px; background: #111c2e; padding: 12px; border-radius: 8px; color: #94a3b8; border: 1px solid #1e293b; }
-    .pp-item img { max-width: 100%; border-radius: 8px; }
-    .pp-item div[data-cms-type="html"] { font-size: 15px; color: #94a3b8; }
-    .pp-empty { text-align: center; padding: 80px 0; color: #64748b; }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Inter',system-ui,sans-serif;line-height:1.7;color:#e2e8f0;background:#0b1220;padding:48px 24px 80px;max-width:720px;margin:0 auto}
+    .pp-header{margin-bottom:48px;padding-bottom:20px;border-bottom:1px solid #1e293b}
+    .pp-header h1{font-size:22px;font-weight:700;color:#f1f5f9}
+    .pp-header p{font-size:13px;color:#64748b;margin-top:4px}
+    .pp-item{margin-bottom:28px}
+    .pp-label{display:inline-block;font-size:10px;font-family:monospace;color:#22c55e;background:rgba(34,197,94,0.08);padding:2px 8px;border-radius:4px;margin-bottom:6px;border:1px solid rgba(34,197,94,0.2)}
+    .pp-item h1{font-size:28px;font-weight:700;color:#f1f5f9}
+    .pp-item h2{font-size:22px;font-weight:600;color:#f1f5f9}
+    .pp-item h3{font-size:18px;font-weight:600;color:#e2e8f0}
+    .pp-item p{font-size:15px;color:#94a3b8}
+    .pp-item pre{font-size:12px;background:#111c2e;padding:12px;border-radius:8px;color:#94a3b8;border:1px solid #1e293b}
+    .pp-item img{max-width:100%;border-radius:8px}
+    .pp-item div[data-cms-type="html"]{font-size:15px;color:#94a3b8}
+    .pp-empty{text-align:center;padding:80px 0;color:#64748b}
   </style>
 </head>
 <body>
