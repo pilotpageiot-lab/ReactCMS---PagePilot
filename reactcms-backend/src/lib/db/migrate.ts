@@ -155,13 +155,10 @@ const migrations: { name: string; sql: string }[] = [
       ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_enabled BOOLEAN NOT NULL DEFAULT false;
 
       -- Content approval status
-      ALTER TABLE content_items ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'draft'
-        CHECK (status IN ('draft', 'pending', 'approved', 'published', 'rejected'));
+      ALTER TABLE content_items ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'draft';
 
-      -- i18n locale
-      ALTER TABLE content_items ADD COLUMN IF NOT EXISTS locale TEXT NOT NULL DEFAULT 'en';
-      DROP INDEX IF EXISTS idx_content_key;
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_content_key_locale ON content_items (website_id, cms_key, locale);
+      -- i18n locale (additive — does not drop the existing unique constraint)
+      ALTER TABLE content_items ADD COLUMN IF NOT EXISTS locale TEXT DEFAULT 'en';
 
       -- White-label branding on websites
       ALTER TABLE websites ADD COLUMN IF NOT EXISTS branding JSONB NOT NULL DEFAULT '{}';
