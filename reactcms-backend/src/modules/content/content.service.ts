@@ -4,6 +4,7 @@ import { invalidateKey } from '../../lib/contentCache';
 import { sanitizeHtml } from '../../utils/sanitize';
 import { getPlanLimits } from '../../lib/planLimits';
 import { fireWebhook } from '../../lib/webhook';
+import { logAudit } from '../../lib/audit';
 import type { UpsertContentDto, ListContentQuery, PublishContentDto } from './content.schema';
 
 export async function listContent(websiteId: string, query: ListContentQuery) {
@@ -86,6 +87,7 @@ export async function upsertContent(
         [dto.content_type, value, dto.metadata, prev.id],
       );
       await invalidateKey(websiteId, key);
+      logAudit(userId, websiteId, 'update', 'content', key, { content_type: dto.content_type });
       return rows[0];
     } else {
       const { rows } = await client.query(
@@ -93,6 +95,7 @@ export async function upsertContent(
          VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
         [websiteId, userId, key, dto.content_type, value, dto.metadata],
       );
+      logAudit(userId, websiteId, 'create', 'content', key, { content_type: dto.content_type });
       return rows[0];
     }
   });

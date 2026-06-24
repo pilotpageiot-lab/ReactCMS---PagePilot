@@ -645,6 +645,8 @@
     _toolbar: null,
     _styleEl: null,
     _handlers: [],     // stored for cleanup
+    _undoStack: [],    // { key, value } entries for undo
+    _redoStack: [],    // { key, value } entries for redo
 
     activate: function () {
       if (this._active) return;
@@ -811,14 +813,46 @@
       this._hideToolbar();
       this._editing = null;
 
-      if (newVal !== el._ppOriginal && window.parent !== window) {
-        window.parent.postMessage({
-          type: 'pagepilot:change',
-          key: key,
-          value: newVal,
-          content_type: contentType,
-          original: el._ppOriginal
-        }, '*');
+      if (newVal !== el._ppOriginal) {
+        this._undoStack.push({ el: el, key: key, oldVal: el._ppOriginal, newVal: newVal, rich: el._ppRich, image: el._ppImage });
+        this._redoStack = [];
+        if (window.parent !== window) {
+          window.parent.postMessage({
+            type: 'pagepilot:change',
+            key: key,
+            value: newVal,
+            content_type: contentType,
+            original: el._ppOriginal
+          }, '*');
+        }
+      }
+    },
+
+    undo: function () {
+      if (this._undoStack.length === 0) return;
+      var entry = this._undoStack.pop();
+      this._redoStack.push(entry);
+      if (entry.image) { entry.el.setAttribute('src', entry.oldVal); }
+      else if (entry.rich) { entry.el.innerHTML = entry.oldVal; }
+      else { entry.el.textContent = entry.oldVal; }
+      entry.el.classList.add('pp-saved');
+      setTimeout(function () { entry.el.classList.remove('pp-saved'); }, 600);
+      if (window.parent !== window) {
+        window.parent.postMessage({ type: 'pagepilot:change', key: entry.key, value: entry.oldVal, content_type: entry.image ? 'image' : entry.rich ? 'richtext' : 'text', original: entry.newVal }, '*');
+      }
+    },
+
+    redo: function () {
+      if (this._redoStack.length === 0) return;
+      var entry = this._redoStack.pop();
+      this._undoStack.push(entry);
+      if (entry.image) { entry.el.setAttribute('src', entry.newVal); }
+      else if (entry.rich) { entry.el.innerHTML = entry.newVal; }
+      else { entry.el.textContent = entry.newVal; }
+      entry.el.classList.add('pp-saved');
+      setTimeout(function () { entry.el.classList.remove('pp-saved'); }, 600);
+      if (window.parent !== window) {
+        window.parent.postMessage({ type: 'pagepilot:change', key: entry.key, value: entry.newVal, content_type: entry.image ? 'image' : entry.rich ? 'richtext' : 'text', original: entry.oldVal }, '*');
       }
     },
 
@@ -946,6 +980,13 @@
       if (!data || typeof data.type !== 'string') return;
       if (data.type === 'pagepilot:init') PagePilot.activate();
       if (data.type === 'pagepilot:deactivate') PagePilot.deactivate();
+    });
+
+    // Ctrl+Z = undo, Ctrl+Shift+Z / Ctrl+Y = redo (only when edit mode active)
+    window.addEventListener('keydown', function (e) {
+      if (!PagePilot._active || PagePilot._editing) return;
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); PagePilot.undo(); }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'Z' || e.key === 'y')) { e.preventDefault(); PagePilot.redo(); }
     });
   }
 

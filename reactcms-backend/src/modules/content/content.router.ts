@@ -161,4 +161,41 @@ router.post(
   },
 );
 
+// ── Bulk export ──────────────────────────────────────────────────────────────
+
+router.get(
+  '/export/json',
+  requireWebsiteMember('viewer'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await contentService.listContent(req.websiteId!, { page: 1, per_page: 10000 });
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="content-export.json"`);
+      res.json(result.data);
+    } catch (err) { next(err); }
+  },
+);
+
+// ── Bulk import ──────────────────────────────────────────────────────────────
+
+router.post(
+  '/import/json',
+  requireWebsiteMember('editor'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const items = req.body as { cms_key: string; content_type: string; value: string }[];
+      if (!Array.isArray(items) || items.length === 0) {
+        res.status(400).json({ error: 'BAD_REQUEST', message: 'Body must be a non-empty JSON array' });
+        return;
+      }
+      const result = await contentService.importBatch(
+        req.websiteId!,
+        req.user!.id,
+        items.map((i) => ({ key: i.cms_key, value: i.value, content_type: i.content_type })),
+      );
+      ok(res, result);
+    } catch (err) { next(err); }
+  },
+);
+
 export { router as contentRouter };

@@ -135,6 +135,49 @@ const migrations: { name: string; sql: string }[] = [
     `,
   },
   {
+    name: '009_low_priority_features',
+    sql: `
+      -- Audit log
+      CREATE TABLE IF NOT EXISTS audit_log (
+        id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id    UUID REFERENCES users(id) ON DELETE SET NULL,
+        website_id UUID REFERENCES websites(id) ON DELETE CASCADE,
+        action     TEXT NOT NULL,
+        entity     TEXT NOT NULL,
+        entity_id  TEXT,
+        details    JSONB NOT NULL DEFAULT '{}',
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+      CREATE INDEX IF NOT EXISTS idx_audit_website ON audit_log (website_id, created_at DESC);
+
+      -- 2FA TOTP secret on users
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_secret TEXT;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_enabled BOOLEAN NOT NULL DEFAULT false;
+
+      -- Content approval status
+      ALTER TABLE content_items ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'draft'
+        CHECK (status IN ('draft', 'pending', 'approved', 'published', 'rejected'));
+
+      -- i18n locale
+      ALTER TABLE content_items ADD COLUMN IF NOT EXISTS locale TEXT NOT NULL DEFAULT 'en';
+      DROP INDEX IF EXISTS idx_content_key;
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_content_key_locale ON content_items (website_id, cms_key, locale);
+
+      -- White-label branding on websites
+      ALTER TABLE websites ADD COLUMN IF NOT EXISTS branding JSONB NOT NULL DEFAULT '{}';
+
+      -- Analytics: content view tracking
+      CREATE TABLE IF NOT EXISTS content_views (
+        id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        website_id UUID NOT NULL REFERENCES websites(id) ON DELETE CASCADE,
+        cms_key    TEXT NOT NULL,
+        viewed_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+      CREATE INDEX IF NOT EXISTS idx_views_website ON content_views (website_id, viewed_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_views_key ON content_views (website_id, cms_key);
+    `,
+  },
+  {
     name: '007_migrations_table',
     sql: `
       CREATE TABLE IF NOT EXISTS _migrations (

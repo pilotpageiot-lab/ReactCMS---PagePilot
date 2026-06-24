@@ -183,4 +183,28 @@ router.post(
   },
 );
 
+// ── 2FA TOTP ────────────────────────────────────────────────────────────────
+
+router.post('/totp/setup', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try { ok(res, await authService.setupTotp(req.user!.id)); } catch (err) { next(err); }
+});
+
+router.post('/totp/enable', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { code } = req.body as { code?: string };
+    if (!code) { res.status(400).json({ error: 'BAD_REQUEST', message: 'code required' }); return; }
+    await authService.enableTotp(req.user!.id, code);
+    ok(res, { message: '2FA enabled' });
+  } catch (err) { next(err); }
+});
+
+router.post('/totp/disable', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { code } = req.body as { code?: string };
+    if (!code) { res.status(400).json({ error: 'BAD_REQUEST', message: 'code required' }); return; }
+    await authService.disableTotp(req.user!.id, code);
+    ok(res, { message: '2FA disabled' });
+  } catch (err) { next(err); }
+});
+
 export { router as authRouter };

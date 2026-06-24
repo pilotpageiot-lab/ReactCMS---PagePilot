@@ -309,6 +309,78 @@ router.get(
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
+// POST /public/track — lightweight analytics (content view tracking)
+// ─────────────────────────────────────────────────────────────────────────────
+
+router.post(
+  '/track',
+  singleKeyRateLimit,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { website_id, keys } = req.body as { website_id?: string; keys?: string[] };
+      if (!website_id || !keys || !Array.isArray(keys)) {
+        res.status(400).json({ error: 'BAD_REQUEST', message: 'website_id and keys[] required' });
+        return;
+      }
+      const limited = keys.slice(0, 50);
+      const values = limited.map((_, i) => `($1, $${i + 2})`).join(',');
+      if (limited.length > 0) {
+        await pool.query(
+          `INSERT INTO content_views (website_id, cms_key) VALUES ${values}`,
+          [website_id, ...limited],
+        );
+      }
+      res.status(204).end();
+    } catch (err) { next(err); }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /public/analytics?website_id=xxx — view counts (JWT required)
+// ─────────────────────────────────────────────────────────────────────────────
+
+router.get(
+  '/analytics',
+  requireAuth,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const websiteId = req.query['website_id'] as string;
+      if (!websiteId) { res.status(400).json({ error: 'BAD_REQUEST', message: 'website_id required' }); return; }
+      const days = Math.min(Number(req.query['days']) || 30, 365);
+
+      const { rows: topKeys } = await pool.query(
+        `SELECT cms_key, COUNT(*) AS views
+         FROM content_views
+         WHERE website_id = $1 AND viewed_at > now() - make_interval(days => $2)
+         GROUP BY cms_key ORDER BY views DESC LIMIT 20`,
+        [websiteId, days],
+      );
+
+      const { rows: dailyCounts } = await pool.query(
+        `SELECT viewed_at::date AS day, COUNT(*) AS views
+         FROM content_views
+         WHERE website_id = $1 AND viewed_at > now() - make_interval(days => $2)
+         GROUP BY day ORDER BY day ASC`,
+        [websiteId, days],
+      );
+
+      const { rows: totalRow } = await pool.query(
+        `SELECT COUNT(*) AS total FROM content_views WHERE website_id = $1`,
+        [websiteId],
+      );
+
+      ok(res, {
+        website_id: websiteId,
+        period_days: days,
+        total_views: parseInt(totalRow[0]?.total ?? '0', 10),
+        top_keys: topKeys,
+        daily: dailyCounts,
+      });
+    } catch (err) { next(err); }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Cache management (JWT-protected — admin use only)
 // ─────────────────────────────────────────────────────────────────────────────
 

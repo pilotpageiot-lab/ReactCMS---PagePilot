@@ -10,6 +10,7 @@ import {
 import * as websitesService from './websites.service';
 import { ok, created, noContent } from '../../utils/response';
 import { BadRequestError } from '../../utils/errors';
+import { getAuditLog } from '../../lib/audit';
 import { z } from 'zod';
 
 const router = Router();
@@ -120,6 +121,20 @@ router.delete(
         req.user!.id,
       );
       noContent(res);
+    } catch (err) { next(err); }
+  },
+);
+
+// ── Audit log ───────────────────────────────────────────────────────────────
+
+router.get(
+  '/:id/audit',
+  requireWebsiteMember('admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const limit = Math.min(Number(req.query['limit']) || 50, 200);
+      const offset = Number(req.query['offset']) || 0;
+      ok(res, await getAuditLog(req.websiteId!, limit, offset));
     } catch (err) { next(err); }
   },
 );

@@ -12,12 +12,14 @@ import { ConflictError, UnauthorizedError, NotFoundError, BadRequestError } from
 import { config } from '../../config';
 import { getPlanLimits } from '../../lib/planLimits';
 import { sendVerificationEmail, sendPasswordResetEmail } from '../../lib/email';
+import { generateTotpSecret, verifyTotp } from '../../lib/totp';
 import type { RegisterDto, LoginDto } from './auth.schema';
 
 interface UserRow {
   id: string; email: string; name: string;
   role: string; password_hash: string;
-  email_verified_at: Date | null; created_at: Date;
+  email_verified_at: Date | null; totp_secret: string | null;
+  totp_enabled: boolean; created_at: Date;
 }
 
 const VERIFY_TOKEN_PREFIX = 'email_verify:';
@@ -37,6 +39,7 @@ function userResponse(user: UserRow) {
     name: user.name,
     role: user.role,
     email_verified: user.email_verified_at !== null,
+    totp_enabled: user.totp_enabled ?? false,
     created_at: user.created_at,
   };
 }
@@ -64,17 +67,27 @@ export async function register(dto: RegisterDto) {
   return { user: userResponse(user), ...tokens, email_sent: emailResult.sent, email_method: emailResult.method };
 }
 
-export async function login(dto: LoginDto) {
+export async function login(dto: LoginDto & { totp_code?: string }) {
   const { rows } = await pool.query<UserRow>(
-    'SELECT id, email, name, role, password_hash, email_verified_at, created_at FROM users WHERE email = $1',
+    'SELECT id, email, name, role, password_hash, email_verified_at, totp_secret, totp_enabled, created_at FROM users WHERE email = $1',
     [dto.email],
   );
   const user = rows[0];
   if (!user) throw new UnauthorizedError('Invalid credentials');
   const valid = await verifyPassword(dto.password, user.password_hash);
   if (!valid) throw new UnauthorizedError('Invalid credentials');
+
+  if (user.totp_enabled && user.totp_secret) {
+    if (!dto.totp_code) {
+      return { requires_totp: true, user: null, access_token: null, refresh_token: null };
+    }
+    if (!verifyTotp(user.totp_secret, dto.totp_code)) {
+      throw new UnauthorizedError('Invalid 2FA code');
+    }
+  }
+
   const tokens = await issueTokens(user);
-  return { user: userResponse(user), ...tokens };
+  return { requires_totp: false, user: userResponse(user), ...tokens };
 }
 
 export async function refresh(refreshToken: string) {
@@ -204,6 +217,35 @@ export async function resetPassword(token: string, newPassword: string) {
   await pool.query('UPDATE users SET password_hash = $1, updated_at = now() WHERE id = $2', [newHash, userId]);
   await redis.del(RESET_TOKEN_PREFIX + token);
   await revokeAllUserTokens(userId);
+}
+
+export async function setupTotp(userId: string) {
+  const { rows } = await pool.query<UserRow>('SELECT email, totp_enabled FROM users WHERE id = $1', [userId]);
+  if (!rows[0]) throw new NotFoundError('User');
+  if (rows[0].totp_enabled) throw new BadRequestError('2FA is already enabled');
+
+  const { secret, uri } = generateTotpSecret(rows[0].email);
+  await pool.query('UPDATE users SET totp_secret = $1 WHERE id = $2', [secret, userId]);
+  return { secret, uri };
+}
+
+export async function enableTotp(userId: string, code: string) {
+  const { rows } = await pool.query<UserRow>('SELECT totp_secret, totp_enabled FROM users WHERE id = $1', [userId]);
+  if (!rows[0]) throw new NotFoundError('User');
+  if (rows[0].totp_enabled) throw new BadRequestError('2FA is already enabled');
+  if (!rows[0].totp_secret) throw new BadRequestError('Run setup first');
+  if (!verifyTotp(rows[0].totp_secret, code)) throw new UnauthorizedError('Invalid 2FA code');
+
+  await pool.query('UPDATE users SET totp_enabled = true WHERE id = $1', [userId]);
+}
+
+export async function disableTotp(userId: string, code: string) {
+  const { rows } = await pool.query<UserRow>('SELECT totp_secret, totp_enabled FROM users WHERE id = $1', [userId]);
+  if (!rows[0]) throw new NotFoundError('User');
+  if (!rows[0].totp_enabled) throw new BadRequestError('2FA is not enabled');
+  if (!rows[0].totp_secret || !verifyTotp(rows[0].totp_secret, code)) throw new UnauthorizedError('Invalid 2FA code');
+
+  await pool.query('UPDATE users SET totp_enabled = false, totp_secret = NULL WHERE id = $1', [userId]);
 }
 
 export async function getPlanUsage(userId: string) {
