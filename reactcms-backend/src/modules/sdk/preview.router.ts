@@ -51,7 +51,7 @@ router.get('/:websiteId', async (req: Request, res: Response, next: NextFunction
     }
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Cache-Control', 'private, max-age=120');
     res.setHeader('Content-Security-Policy',
       "default-src *; script-src * 'unsafe-inline' 'unsafe-eval'; style-src * 'unsafe-inline'; " +
       "img-src * data: blob:; connect-src *; font-src * data:; frame-ancestors *; media-src *");

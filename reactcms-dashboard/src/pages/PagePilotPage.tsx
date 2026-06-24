@@ -88,18 +88,19 @@ export function PagePilotPage() {
     if (!id) return;
     setSaving(true);
     const pending = Array.from(changes.values()).filter((c) => c.status === 'pending');
-    for (const change of pending) {
-      setChanges((p) => { const n = new Map(p); n.set(change.key, { ...change, status: 'saving' }); return n; });
-      try {
-        await contentApi.upsert(id, change.key, { content_type: change.content_type, value: change.value });
-        setChanges((p) => { const n = new Map(p); n.set(change.key, { ...change, status: 'saved' }); return n; });
-      } catch {
-        setChanges((p) => { const n = new Map(p); n.set(change.key, { ...change, status: 'error' }); return n; });
-        toast.error(`Failed to save ${change.key}`);
-      }
-    }
+    pending.forEach((c) => setChanges((p) => { const n = new Map(p); n.set(c.key, { ...c, status: 'saving' }); return n; }));
+
+    const results = await Promise.allSettled(
+      pending.map((change) =>
+        contentApi.upsert(id, change.key, { content_type: change.content_type, value: change.value })
+          .then(() => { setChanges((p) => { const n = new Map(p); n.set(change.key, { ...change, status: 'saved' }); return n; }); })
+          .catch(() => { setChanges((p) => { const n = new Map(p); n.set(change.key, { ...change, status: 'error' }); return n; }); })
+      ),
+    );
+    const failed = results.filter((r) => r.status === 'rejected').length;
     setSaving(false);
-    if (pending.length > 0) toast.success(`Saved ${pending.length} draft(s)`);
+    if (failed > 0) toast.error(`${failed} save(s) failed`);
+    else if (pending.length > 0) toast.success(`Saved ${pending.length} draft(s)`);
   }, [id, changes]);
 
   const publishAll = useCallback(async () => {

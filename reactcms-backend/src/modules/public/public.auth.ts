@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { pool } from '../../lib/db/pool';
+import { redis } from '../../lib/redis';
 import { sha256 } from '../../utils/hash';
 import { UnauthorizedError, ForbiddenError, BadRequestError } from '../../utils/errors';
 import { logger } from '../../lib/logger';
@@ -9,16 +10,16 @@ interface ApiKeyRow {
   expires_at: string | null; label: string;
 }
 
+const KEY_CACHE_PREFIX = 'apikey:';
+const KEY_CACHE_TTL = 300; // 5 minutes
+
 function extractRawKey(req: Request): string | null {
-  // 1. Preferred: header
   const header = req.headers['x-cms-key'];
   if (typeof header === 'string' && header.length > 0) return header;
 
-  // 2. Bearer token
   const auth = req.headers.authorization;
   if (auth?.startsWith('Bearer cms_')) return auth.slice(7);
 
-  // SECURITY FIX: query param is now a hard error, not a warn-and-continue
   if (req.query['api_key']) {
     throw new BadRequestError(
       'API key must be supplied via X-CMS-Key header, not ?api_key= query parameter. ' +
@@ -41,11 +42,26 @@ export async function validatePublicApiKey(
     }
 
     const hash = sha256(raw);
-    const { rows } = await pool.query<ApiKeyRow>(
-      `SELECT id, website_id, scope, expires_at, label FROM api_keys WHERE key_hash = $1`,
-      [hash],
-    );
-    const keyRow = rows[0];
+    let keyRow: ApiKeyRow | null = null;
+
+    // Check Redis cache first
+    try {
+      const cached = await redis.get(KEY_CACHE_PREFIX + hash);
+      if (cached) keyRow = JSON.parse(cached);
+    } catch { /* Redis miss — fall through to DB */ }
+
+    // DB fallback
+    if (!keyRow) {
+      const { rows } = await pool.query<ApiKeyRow>(
+        `SELECT id, website_id, scope, expires_at, label FROM api_keys WHERE key_hash = $1`,
+        [hash],
+      );
+      keyRow = rows[0] ?? null;
+      if (keyRow) {
+        redis.set(KEY_CACHE_PREFIX + hash, JSON.stringify(keyRow), { EX: KEY_CACHE_TTL }).catch(() => {});
+      }
+    }
+
     if (!keyRow) throw new UnauthorizedError('Invalid API key');
 
     if (keyRow.expires_at && new Date(keyRow.expires_at) < new Date()) {

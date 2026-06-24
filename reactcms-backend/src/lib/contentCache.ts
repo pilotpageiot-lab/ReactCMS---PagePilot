@@ -14,7 +14,7 @@
 import { redis } from './redis';
 import { logger } from './logger';
 
-const CONTENT_TTL_SECONDS = 300; // 5 minutes
+const CONTENT_TTL_SECONDS = 3600; // 1 hour (invalidated on publish)
 const KEY_PREFIX = 'content';
 
 export interface CachedContentItem {
