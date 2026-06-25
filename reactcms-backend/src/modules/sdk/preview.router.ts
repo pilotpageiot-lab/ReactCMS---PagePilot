@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import * as cheerio from 'cheerio';
 import { pool } from '../../lib/db/pool';
 import { redis } from '../../lib/redis';
 import { escapeHtml } from '../../utils/sanitize';
@@ -127,17 +128,20 @@ router.get('/:websiteId', async (req: Request, res: Response, next: NextFunction
     if (!rows[0].role) throw new ForbiddenError('You are not a member of this website');
     const website = rows[0];
 
+    // Always fetch latest published content
+    const { rows: contentRows } = await pool.query<ContentRow>(
+      `SELECT cms_key, content_type, value FROM content_items
+       WHERE website_id = $1 AND is_published = true LIMIT 500`,
+      [websiteId],
+    );
+
     let html: string;
 
     if (website.custom_domain) {
-      html = await getCachedMirror(websiteId, website.custom_domain);
+      const mirrorHtml = await getCachedMirror(websiteId, website.custom_domain);
+      html = injectContentIntoHtml(mirrorHtml, contentRows);
     } else {
-      const { rows: contentRows } = await pool.query(
-        `SELECT cms_key, content_type, value FROM content_items
-         WHERE website_id = $1 ORDER BY cms_key LIMIT 500`,
-        [websiteId],
-      );
-      html = buildFallbackHtml(website, contentRows as ContentRow[]);
+      html = buildFallbackHtml(website, contentRows);
     }
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -150,6 +154,24 @@ router.get('/:websiteId', async (req: Request, res: Response, next: NextFunction
 });
 
 // ── Mirror mode with Redis cache ─────────────────────────────────────────────
+
+function injectContentIntoHtml(html: string, content: ContentRow[]): string {
+  if (content.length === 0) return html;
+  const $ = cheerio.load(html);
+  for (const row of content) {
+    if (!row.value) continue;
+    const el = $(`[data-cms="${row.cms_key}"]`);
+    if (el.length === 0) continue;
+    if (row.content_type === 'image') {
+      el.attr('src', row.value);
+    } else if (row.content_type === 'richtext') {
+      el.html(row.value);
+    } else {
+      el.text(row.value);
+    }
+  }
+  return $.html();
+}
 
 async function getCachedMirror(websiteId: string, siteUrl: string): Promise<string> {
   const cacheKey = MIRROR_CACHE_PREFIX + websiteId;
