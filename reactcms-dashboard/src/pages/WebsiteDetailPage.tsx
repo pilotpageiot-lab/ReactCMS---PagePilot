@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link, Navigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronRight, FileText, Key, Users, Settings, Pencil } from 'lucide-react';
+
+const API_URL = import.meta.env['VITE_API_URL'] ?? '';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Badge } from '@/components/ui/Badge';
 import { websitesApi } from '@/api/websites';
@@ -29,6 +31,33 @@ export function WebsiteDetailPage() {
     queryFn: () => websitesApi.get(id!),
     enabled: !!id,
   });
+
+  // Prefetch the SDK script + warm the preview route so PagePilot opens fast
+  useEffect(() => {
+    if (!id) return;
+    const sdkUrl = `${API_URL}/sdk/v1/sdk.js`;
+    const token = localStorage.getItem('rcms_access_token');
+    const previewUrl = token ? `${API_URL}/sdk/v1/preview/${id}?token=${encodeURIComponent(token)}` : null;
+
+    // Prefetch SDK script (browser caches it for when the iframe needs it)
+    let link = document.querySelector<HTMLLinkElement>(`link[href="${sdkUrl}"]`);
+    if (!link) {
+      link = document.createElement('link');
+      link.rel = 'prefetch';
+      link.as = 'script';
+      link.href = sdkUrl;
+      document.head.appendChild(link);
+    }
+
+    // Warm the preview route in background (populates Redis mirror cache)
+    if (previewUrl) {
+      const previewLink = document.createElement('link');
+      previewLink.rel = 'prefetch';
+      previewLink.as = 'document';
+      previewLink.href = previewUrl;
+      document.head.appendChild(previewLink);
+    }
+  }, [id]);
 
   if (!id) return <Navigate to="/websites" replace />;
 
