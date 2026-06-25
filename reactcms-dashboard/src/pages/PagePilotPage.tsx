@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link, Navigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Loader2, Save, Rocket, List, X, Monitor, Tablet, Smartphone, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/store/auth';
@@ -39,6 +39,12 @@ export function PagePilotPage() {
   const [loadError, setLoadError] = useState('');
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const initRetryRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const queryClient = useQueryClient();
+
+  // Invalidate content cache when leaving PagePilot so ContentTab shows fresh data
+  useEffect(() => {
+    return () => { queryClient.invalidateQueries({ queryKey: ['content', id] }); };
+  }, [id, queryClient]);
 
   const { data: website } = useQuery({
     queryKey: ['website', id],

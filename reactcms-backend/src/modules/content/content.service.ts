@@ -1,10 +1,15 @@
 import { pool, withTransaction, setTenantContext, tenantQuery } from '../../lib/db/pool';
 import { NotFoundError } from '../../utils/errors';
 import { invalidateKey } from '../../lib/contentCache';
+import { redis } from '../../lib/redis';
 import { sanitizeHtml } from '../../utils/sanitize';
 import { getPlanLimits } from '../../lib/planLimits';
 import { fireWebhook } from '../../lib/webhook';
 import { logAudit } from '../../lib/audit';
+
+function clearPreviewCache(websiteId: string) {
+  redis.del('preview:mirror:' + websiteId).catch(() => {});
+}
 import type { UpsertContentDto, ListContentQuery, PublishContentDto } from './content.schema';
 
 export async function listContent(websiteId: string, query: ListContentQuery) {
@@ -87,6 +92,7 @@ export async function upsertContent(
         [dto.content_type, value, dto.metadata, prev.id],
       );
       await invalidateKey(websiteId, key);
+      clearPreviewCache(websiteId);
       logAudit(userId, websiteId, 'update', 'content', key, { content_type: dto.content_type });
       return rows[0];
     } else {
@@ -95,6 +101,7 @@ export async function upsertContent(
          VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
         [websiteId, userId, key, dto.content_type, value, dto.metadata],
       );
+      clearPreviewCache(websiteId);
       logAudit(userId, websiteId, 'create', 'content', key, { content_type: dto.content_type });
       return rows[0];
     }
@@ -132,6 +139,7 @@ export async function publishContent(websiteId: string, key: string, dto: Publis
   const item = rows[0];
   if (!item) throw new NotFoundError(`Content key "${key}"`);
   await invalidateKey(websiteId, key);
+  clearPreviewCache(websiteId);
   fireWebhook(websiteId, 'content.published', { cms_key: key, value: item.value }).catch(() => {});
   return item;
 }
