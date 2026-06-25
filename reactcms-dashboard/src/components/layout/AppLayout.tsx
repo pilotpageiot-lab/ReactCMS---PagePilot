@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Outlet, Navigate } from 'react-router-dom';
-import { Menu, Mail, Loader2 } from 'lucide-react';
+import { Menu, Mail } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { useAuthStore } from '@/store/auth';
 import { authApi } from '@/api/auth';
