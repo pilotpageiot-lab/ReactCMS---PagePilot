@@ -529,11 +529,19 @@
    * @param {Element|Document} [root]
    * @returns {Promise<{created:string[], existing:string[], total:number}>}
    */
-  ReactCMS.prototype.discover = function (root) {
+  ReactCMS.prototype.discover = function (root, _retries) {
     var self = this;
+    var maxRetries = 5;
+    var attempt = _retries || 0;
     var found = discoverElements(root);
     if (!found.length) {
-      log('info', 'Auto-discover found no text elements to register');
+      if (attempt < maxRetries) {
+        var delayMs = (attempt + 1) * 1000;
+        log('info', 'Auto-discover found no elements — retrying in ' + delayMs + 'ms (attempt ' + (attempt + 1) + '/' + maxRetries + ')');
+        return new Promise(function (resolve) { setTimeout(resolve, delayMs); })
+          .then(function () { return self.discover(root, attempt + 1); });
+      }
+      log('info', 'Auto-discover found no text elements after ' + maxRetries + ' retries');
       return Promise.resolve({ created: [], existing: [], total: 0 });
     }
 
