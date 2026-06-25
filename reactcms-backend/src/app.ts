@@ -77,7 +77,7 @@ export function createApp() {
   // Must come before the sdkRouter so /sdk/v1/sdk.js is served without API key auth.
   const sdkDistPath = path.resolve(__dirname, '../../reactcms-sdk/dist');
   app.use('/sdk/v1', cors({ origin: '*' }), express.static(sdkDistPath, {
-    maxAge: '1h',
+    maxAge: '5m',
     setHeaders: (res, filePath) => {
       if (filePath.endsWith('.js')) {
         res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
