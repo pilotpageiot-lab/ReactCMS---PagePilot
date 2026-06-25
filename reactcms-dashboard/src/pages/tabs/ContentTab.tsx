@@ -47,28 +47,28 @@ function ContentRow({
           : 'border-l-transparent hover:bg-gray-50',
       )}
     >
-      {/* Status dot */}
+      {/* Status dot — 2.5px for visibility */}
       <span
-        className={clsx('w-1.5 h-1.5 rounded-full shrink-0', item.is_published ? 'bg-emerald-400' : 'bg-gray-300')}
+        className={clsx('w-2 h-2 rounded-full shrink-0', item.is_published ? 'bg-emerald-400' : 'bg-gray-300')}
         title={item.is_published ? 'Published' : 'Draft'}
       />
 
       {/* Name + key */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
-          <p className={clsx('text-[12.5px] font-medium truncate', selected ? 'text-indigo-700' : 'text-gray-900')}>
+          <p className={clsx('text-xs font-medium truncate leading-tight', selected ? 'text-indigo-700' : 'text-gray-900')}>
             {humanizeKey(item.cms_key)}
           </p>
           <span
             className={clsx(
-              'text-[9px] font-semibold uppercase px-1 py-px rounded shrink-0',
-              item.content_type === 'richtext' ? 'bg-purple-100 text-purple-500' :
-              item.content_type === 'image'    ? 'bg-blue-100 text-blue-500' :
-              item.content_type === 'json'     ? 'bg-amber-100 text-amber-500' :
-                                                  'bg-gray-100 text-gray-400',
+              'text-[10px] font-medium px-1.5 py-0.5 rounded shrink-0',
+              item.content_type === 'richtext' ? 'bg-purple-100 text-purple-600' :
+              item.content_type === 'image'    ? 'bg-blue-100 text-blue-600' :
+              item.content_type === 'json'     ? 'bg-amber-100 text-amber-600' :
+                                                  'bg-gray-100 text-gray-500',
             )}
           >
-            {item.content_type === 'richtext' ? 'rich' : item.content_type}
+            {contentTypeLabel(item.content_type as ContentType)}
           </span>
         </div>
         <p className="text-[10px] font-mono text-gray-400 truncate">{item.cms_key}</p>
@@ -77,10 +77,10 @@ function ContentRow({
       {/* Delete */}
       <button
         onClick={(e) => { e.stopPropagation(); onDelete(); }}
-        className="opacity-0 group-hover:opacity-100 p-0.5 text-gray-300 hover:text-red-500 rounded transition-all shrink-0"
+        className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-all shrink-0"
         title="Delete"
       >
-        <Trash2 size={11} />
+        <Trash2 size={12} />
       </button>
     </div>
   );
@@ -295,7 +295,7 @@ function FooterStats({ items, onDeleteAll }: { items: ContentItem[]; onDeleteAll
           Delete all
         </button>
       </div>
-      <div className="w-full h-1 bg-gray-100 rounded-full overflow-hidden">
+      <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
         <div
           className="h-full rounded-full transition-all duration-500"
           style={{ width: `${pct}%`, background: pct === 100 ? '#22c55e' : '#6366f1' }}

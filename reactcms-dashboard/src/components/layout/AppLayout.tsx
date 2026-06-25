@@ -31,41 +31,33 @@ export function AppLayout() {
     <div className="flex h-screen overflow-hidden bg-gray-50">
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Mobile top bar */}
-        <div className="md:hidden flex items-center gap-2.5 px-4 h-12 border-b border-gray-100 bg-white shrink-0">
+        {/* Mobile top bar — larger touch targets */}
+        <div className="md:hidden flex items-center gap-3 px-4 h-14 border-b border-gray-100 bg-white shrink-0">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="p-1.5 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition-colors"
+            className="p-2 -ml-1 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition-colors"
             aria-label="Open menu"
           >
             <Menu size={20} />
           </button>
-          <div className="w-6 h-6 rounded-md bg-indigo-600 flex items-center justify-center">
-            <span className="text-white text-[10px] font-bold">PP</span>
+          <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center">
+            <span className="text-white text-xs font-bold">PP</span>
           </div>
           <span className="text-sm font-semibold text-gray-900">PagePilot</span>
         </div>
 
         {/* Email verification banner */}
         {user && !user.email_verified && (
-          <div
-            className="flex items-center gap-2 px-4 py-2.5 text-xs shrink-0"
-            style={{ background: 'rgba(245,158,11,0.1)', borderBottom: '1px solid rgba(245,158,11,0.2)' }}
-          >
-            <Mail size={13} style={{ color: '#f59e0b' }} />
-            <span style={{ color: '#f59e0b' }} className="font-medium">
-              Please verify your email address.
-            </span>
-            <span style={{ color: '#92400e' }} className="hidden sm:inline">
-              Check your inbox for a verification link.
-            </span>
+          <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm shrink-0 bg-amber-50 border-b border-amber-200">
+            <Mail size={14} className="text-amber-600 shrink-0" />
+            <span className="text-amber-700 font-medium">Please verify your email.</span>
+            <span className="text-amber-600 hidden sm:inline text-xs">Check your inbox for a verification link.</span>
             <button
               onClick={handleResend}
               disabled={resending}
-              className="ml-auto text-xs font-semibold px-2.5 py-1 rounded-md transition-colors"
-              style={{ color: '#f59e0b', background: 'rgba(245,158,11,0.1)' }}
+              className="ml-auto text-xs font-semibold px-3 py-1.5 rounded-lg bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50 transition-colors"
             >
-              {resending ? <Loader2 size={12} className="animate-spin" /> : 'Resend email'}
+              {resending ? 'Sending…' : 'Resend email'}
             </button>
           </div>
         )}
