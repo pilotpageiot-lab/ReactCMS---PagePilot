@@ -118,7 +118,7 @@ async function buildMirrorHtml(siteUrl: string, apiUrl: string): Promise<string>
     (function(){
       var s=document.createElement('script');
       s.src="${escapeHtml(apiUrl)}/sdk/v1/sdk.js";
-      s.onload=function(){
+      s.onload=s.onerror=function(){
         if(window.parent!==window) window.parent.postMessage({type:'pagepilot:ready'},'*');
       };
       document.head.appendChild(s);
@@ -181,7 +181,7 @@ function buildFallbackHtml(
     (function(){
       var s=document.createElement('script');
       s.src="${escapeHtml(apiUrl)}/sdk/v1/sdk.js";
-      s.onload=function(){
+      s.onload=s.onerror=function(){
         if(window.parent!==window) window.parent.postMessage({type:'pagepilot:ready'},'*');
       };
       document.head.appendChild(s);

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link, Navigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Loader2, Save, Rocket, List, X, Monitor, Tablet, Smartphone } from 'lucide-react';
+import { ArrowLeft, Loader2, Save, Rocket, List, X, Monitor, Tablet, Smartphone, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/store/auth';
 import { websitesApi } from '@/api/websites';
@@ -22,12 +22,7 @@ interface PendingChange {
 }
 
 type ViewMode = 'desktop' | 'tablet' | 'mobile';
-
-const VIEW_WIDTHS: Record<ViewMode, string> = {
-  desktop: '100%',
-  tablet: '768px',
-  mobile: '375px',
-};
+const VIEW_WIDTHS: Record<ViewMode, string> = { desktop: '100%', tablet: '768px', mobile: '375px' };
 
 export function PagePilotPage() {
   const { id } = useParams<{ id: string }>();
@@ -40,7 +35,9 @@ export function PagePilotPage() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [elementCount, setElementCount] = useState(0);
   const [viewMode, setViewMode] = useState<ViewMode>('desktop');
+  const [loadStatus, setLoadStatus] = useState<'loading' | 'ready' | 'timeout'>('loading');
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const initRetryRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const { data: website } = useQuery({
     queryKey: ['website', id],
@@ -48,6 +45,7 @@ export function PagePilotPage() {
     enabled: !!id,
   });
 
+  // PostMessage bridge with retry logic
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
       const data = event.data;
@@ -56,7 +54,10 @@ export function PagePilotPage() {
       switch (data.type) {
         case 'pagepilot:ready':
           setIframeReady(true);
+          setLoadStatus('ready');
+          // Send init immediately + clear any retry interval
           iframeRef.current?.contentWindow?.postMessage({ type: 'pagepilot:init' }, '*');
+          if (initRetryRef.current) { clearInterval(initRetryRef.current); initRetryRef.current = null; }
           break;
         case 'pagepilot:elements':
           setElementCount(data.count ?? 0);
@@ -65,11 +66,8 @@ export function PagePilotPage() {
           setChanges((prev) => {
             const next = new Map(prev);
             next.set(data.key, {
-              key: data.key,
-              value: data.value,
-              content_type: data.content_type,
-              original: data.original,
-              status: 'pending',
+              key: data.key, value: data.value, content_type: data.content_type,
+              original: data.original, status: 'pending',
             });
             return next;
           });
@@ -78,8 +76,29 @@ export function PagePilotPage() {
       }
     }
     window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      if (initRetryRef.current) clearInterval(initRetryRef.current);
+    };
   }, [panelOpen]);
+
+  // Retry sending pagepilot:init every 2s + timeout after 20s
+  useEffect(() => {
+    if (iframeReady || !iframeRef.current) return;
+
+    const startTime = Date.now();
+    initRetryRef.current = setInterval(() => {
+      if (iframeReady) { clearInterval(initRetryRef.current!); return; }
+      // Keep trying to send init in case the iframe loaded but we missed the ready signal
+      iframeRef.current?.contentWindow?.postMessage({ type: 'pagepilot:init' }, '*');
+      if (Date.now() - startTime > 20_000) {
+        setLoadStatus('timeout');
+        clearInterval(initRetryRef.current!);
+      }
+    }, 2000);
+
+    return () => { if (initRetryRef.current) clearInterval(initRetryRef.current); };
+  }, [iframeReady]);
 
   const pendingCount = Array.from(changes.values()).filter((c) => c.status === 'pending').length;
   const savedCount = Array.from(changes.values()).filter((c) => c.status === 'saved').length;
@@ -89,7 +108,6 @@ export function PagePilotPage() {
     setSaving(true);
     const pending = Array.from(changes.values()).filter((c) => c.status === 'pending');
     pending.forEach((c) => setChanges((p) => { const n = new Map(p); n.set(c.key, { ...c, status: 'saving' }); return n; }));
-
     const results = await Promise.allSettled(
       pending.map((change) =>
         contentApi.upsert(id, change.key, { content_type: change.content_type, value: change.value })
@@ -119,6 +137,14 @@ export function PagePilotPage() {
     if (count > 0) toast.success(`Published ${count} key(s)`);
   }, [id, changes]);
 
+  const reloadPreview = () => {
+    setIframeReady(false);
+    setLoadStatus('loading');
+    if (iframeRef.current) {
+      iframeRef.current.src = iframeRef.current.src;
+    }
+  };
+
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (!id) return <Navigate to="/websites" replace />;
 
@@ -127,18 +153,12 @@ export function PagePilotPage() {
 
   return (
     <div className="h-screen flex flex-col" style={{ background: '#070d18' }}>
-      {/* ── Toolbar ─────────────────────────────────────────────────────── */}
-      <div
-        className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 shrink-0"
-        style={{ height: 48, background: '#0b1220', borderBottom: '1px solid #1e293b' }}
-      >
+      {/* Toolbar */}
+      <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 shrink-0" style={{ height: 48, background: '#0b1220', borderBottom: '1px solid #1e293b' }}>
         <Link to={`/websites/${id}`} className="p-1.5 rounded-lg hover:bg-white/5 transition-colors" style={{ color: '#94a3b8' }}>
           <ArrowLeft size={18} />
         </Link>
-
         <div className="w-px h-5" style={{ background: '#1e293b' }} />
-
-        {/* Brand */}
         <div className="flex items-center gap-2 min-w-0">
           <div className="w-5 h-5 rounded bg-[#22c55e] flex items-center justify-center shrink-0">
             <span className="text-[8px] font-black text-[#0b1220]">PP</span>
@@ -148,94 +168,58 @@ export function PagePilotPage() {
           </span>
         </div>
 
-        {/* Viewport switcher — desktop only */}
+        {/* Viewport switcher */}
         <div className="hidden md:flex items-center gap-0.5 ml-3 p-0.5 rounded-lg" style={{ background: 'rgba(255,255,255,0.04)' }}>
           {([
             { mode: 'desktop' as ViewMode, icon: <Monitor size={14} /> },
             { mode: 'tablet' as ViewMode, icon: <Tablet size={14} /> },
             { mode: 'mobile' as ViewMode, icon: <Smartphone size={14} /> },
           ]).map(({ mode, icon }) => (
-            <button
-              key={mode}
-              onClick={() => setViewMode(mode)}
-              className="p-1.5 rounded-md transition-colors"
-              style={{
-                color: viewMode === mode ? '#22c55e' : '#64748b',
-                background: viewMode === mode ? 'rgba(34,197,94,0.1)' : 'transparent',
-              }}
-              title={mode}
-            >
-              {icon}
-            </button>
+            <button key={mode} onClick={() => setViewMode(mode)} className="p-1.5 rounded-md transition-colors"
+              style={{ color: viewMode === mode ? '#22c55e' : '#64748b', background: viewMode === mode ? 'rgba(34,197,94,0.1)' : 'transparent' }}
+              title={mode}>{icon}</button>
           ))}
         </div>
 
         {iframeReady && elementCount > 0 && (
-          <span className="text-[10px] hidden lg:inline ml-2" style={{ color: '#475569' }}>
-            {elementCount} editable
-          </span>
+          <span className="text-[10px] hidden lg:inline ml-2" style={{ color: '#475569' }}>{elementCount} editable</span>
         )}
 
-        {/* Right actions */}
         <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
           {changes.size > 0 && (
-            <button
-              onClick={() => setPanelOpen(!panelOpen)}
+            <button onClick={() => setPanelOpen(!panelOpen)}
               className="flex items-center gap-1.5 text-[11px] font-medium px-2 py-1.5 rounded-md transition-colors"
-              style={{
-                color: pendingCount > 0 ? '#f59e0b' : '#22c55e',
-                background: pendingCount > 0 ? 'rgba(245,158,11,0.08)' : 'rgba(34,197,94,0.08)',
-                border: '1px solid ' + (pendingCount > 0 ? 'rgba(245,158,11,0.2)' : 'rgba(34,197,94,0.2)'),
-              }}
-            >
+              style={{ color: pendingCount > 0 ? '#f59e0b' : '#22c55e', background: pendingCount > 0 ? 'rgba(245,158,11,0.08)' : 'rgba(34,197,94,0.08)', border: '1px solid ' + (pendingCount > 0 ? 'rgba(245,158,11,0.2)' : 'rgba(34,197,94,0.2)') }}>
               <List size={11} />
               <span className="hidden sm:inline">{changes.size} change{changes.size !== 1 ? 's' : ''}</span>
               <span className="sm:hidden">{changes.size}</span>
             </button>
           )}
-
-          <button
-            onClick={saveAll}
-            disabled={saving || pendingCount === 0}
+          <button onClick={saveAll} disabled={saving || pendingCount === 0}
             className="flex items-center gap-1.5 h-7 px-2.5 text-[11px] font-semibold rounded-lg transition-all disabled:opacity-30"
-            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid #1e293b', color: '#e2e8f0' }}
-          >
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid #1e293b', color: '#e2e8f0' }}>
             {saving ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />}
             <span className="hidden sm:inline">Save{pendingCount > 0 ? ` (${pendingCount})` : ''}</span>
           </button>
-
-          <button
-            onClick={publishAll}
-            disabled={publishing || savedCount === 0}
+          <button onClick={publishAll} disabled={publishing || savedCount === 0}
             className="flex items-center gap-1.5 h-7 px-2.5 text-[11px] font-bold rounded-lg transition-all disabled:opacity-30"
-            style={{ background: '#22c55e', color: '#0b1220' }}
-          >
+            style={{ background: '#22c55e', color: '#0b1220' }}>
             {publishing ? <Loader2 size={11} className="animate-spin" /> : <Rocket size={11} />}
             <span className="hidden sm:inline">Publish{savedCount > 0 ? ` (${savedCount})` : ''}</span>
           </button>
         </div>
       </div>
 
-      {/* ── Main area ───────────────────────────────────────────────────── */}
+      {/* Main area */}
       <div className="flex-1 flex min-h-0 relative">
-        {/* iframe wrapper with viewport simulation */}
         <div className="flex-1 flex items-start justify-center overflow-auto" style={{ background: '#070d18' }}>
           {previewUrl ? (
-            <iframe
-              ref={iframeRef}
-              src={previewUrl}
-              className="border-none transition-all duration-300"
-              style={{
-                width: VIEW_WIDTHS[viewMode],
-                maxWidth: '100%',
-                height: '100%',
-                background: '#fff',
+            <iframe ref={iframeRef} src={previewUrl} className="border-none transition-all duration-300"
+              style={{ width: VIEW_WIDTHS[viewMode], maxWidth: '100%', height: '100%', background: '#fff',
                 boxShadow: viewMode !== 'desktop' ? '0 0 40px rgba(0,0,0,0.5)' : 'none',
                 borderRadius: viewMode !== 'desktop' ? '8px' : '0',
-                margin: viewMode !== 'desktop' ? '16px auto' : '0',
-              }}
-              title="PagePilot Preview"
-            />
+                margin: viewMode !== 'desktop' ? '16px auto' : '0' }}
+              title="PagePilot Preview" />
           ) : (
             <div className="flex-1 flex items-center justify-center h-full" style={{ color: '#64748b' }}>
               <div className="text-center">
@@ -246,27 +230,41 @@ export function PagePilotPage() {
           )}
         </div>
 
-        {/* Loading overlay */}
+        {/* Loading / timeout overlay */}
         {previewUrl && !iframeReady && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3" style={{ background: 'rgba(7,13,24,0.9)' }}>
-            <Loader2 size={24} className="animate-spin" style={{ color: '#22c55e' }} />
-            <span className="text-xs" style={{ color: '#64748b' }}>Loading website preview…</span>
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4" style={{ background: 'rgba(7,13,24,0.92)' }}>
+            {loadStatus === 'loading' && (
+              <>
+                <Loader2 size={24} className="animate-spin" style={{ color: '#22c55e' }} />
+                <span className="text-xs" style={{ color: '#64748b' }}>Loading website preview…</span>
+                <span className="text-[10px]" style={{ color: '#334155' }}>This may take a moment on first load</span>
+              </>
+            )}
+            {loadStatus === 'timeout' && (
+              <>
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: 'rgba(245,158,11,0.1)' }}>
+                  <RefreshCw size={20} style={{ color: '#f59e0b' }} />
+                </div>
+                <span className="text-sm font-medium" style={{ color: '#e2e8f0' }}>Preview is taking longer than usual</span>
+                <span className="text-xs text-center max-w-xs" style={{ color: '#64748b' }}>
+                  The server may be waking up from a cold start. Click retry to try again.
+                </span>
+                <button onClick={reloadPreview}
+                  className="flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg transition-colors"
+                  style={{ background: '#22c55e', color: '#0b1220' }}>
+                  <RefreshCw size={12} /> Retry
+                </button>
+              </>
+            )}
           </div>
         )}
 
         {/* Changes panel */}
         {panelOpen && changes.size > 0 && (
-          <div
-            className="w-72 sm:w-80 shrink-0 flex flex-col overflow-hidden"
-            style={{ background: '#0b1220', borderLeft: '1px solid #1e293b' }}
-          >
+          <div className="w-72 sm:w-80 shrink-0 flex flex-col overflow-hidden" style={{ background: '#0b1220', borderLeft: '1px solid #1e293b' }}>
             <div className="flex items-center justify-between px-4 py-2.5 shrink-0" style={{ borderBottom: '1px solid #1e293b' }}>
-              <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: '#475569' }}>
-                Changes
-              </span>
-              <button onClick={() => setPanelOpen(false)} className="p-0.5 rounded hover:bg-white/5 transition-colors" style={{ color: '#475569' }}>
-                <X size={13} />
-              </button>
+              <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: '#475569' }}>Changes</span>
+              <button onClick={() => setPanelOpen(false)} className="p-0.5 rounded hover:bg-white/5 transition-colors" style={{ color: '#475569' }}><X size={13} /></button>
             </div>
             <div className="flex-1 overflow-y-auto">
               {Array.from(changes.values()).map((c) => (
