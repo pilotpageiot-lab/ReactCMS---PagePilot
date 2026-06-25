@@ -40,9 +40,10 @@ export function WebsiteDetailPage() {
     const previewUrl = token ? `${API_URL}/sdk/v1/preview/${id}?token=${encodeURIComponent(token)}` : null;
 
     // Prefetch SDK script (browser caches it for when the iframe needs it)
-    let link = document.querySelector<HTMLLinkElement>(`link[href="${sdkUrl}"]`);
-    if (!link) {
-      link = document.createElement('link');
+    const existing = Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="prefetch"]'))
+      .some((l) => l.href === sdkUrl);
+    if (!existing) {
+      const link = document.createElement('link');
       link.rel = 'prefetch';
       link.as = 'script';
       link.href = sdkUrl;
