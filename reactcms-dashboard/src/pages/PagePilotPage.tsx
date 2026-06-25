@@ -35,7 +35,8 @@ export function PagePilotPage() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [elementCount, setElementCount] = useState(0);
   const [viewMode, setViewMode] = useState<ViewMode>('desktop');
-  const [loadStatus, setLoadStatus] = useState<'loading' | 'ready' | 'timeout'>('loading');
+  const [loadStatus, setLoadStatus] = useState<'loading' | 'ready' | 'timeout' | 'error'>('loading');
+  const [loadError, setLoadError] = useState('');
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const initRetryRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -55,9 +56,16 @@ export function PagePilotPage() {
         case 'pagepilot:ready':
           setIframeReady(true);
           setLoadStatus('ready');
-          // Send init immediately + clear any retry interval
+          // Send init immediately, then retry a few more times to ensure SDK listener is ready
           iframeRef.current?.contentWindow?.postMessage({ type: 'pagepilot:init' }, '*');
+          setTimeout(() => iframeRef.current?.contentWindow?.postMessage({ type: 'pagepilot:init' }, '*'), 500);
+          setTimeout(() => iframeRef.current?.contentWindow?.postMessage({ type: 'pagepilot:init' }, '*'), 1500);
+          setTimeout(() => iframeRef.current?.contentWindow?.postMessage({ type: 'pagepilot:init' }, '*'), 3000);
           if (initRetryRef.current) { clearInterval(initRetryRef.current); initRetryRef.current = null; }
+          break;
+        case 'pagepilot:error':
+          setLoadStatus('error');
+          setLoadError(data.message ?? 'Failed to load editing tools');
           break;
         case 'pagepilot:elements':
           setElementCount(data.count ?? 0);
@@ -145,8 +153,20 @@ export function PagePilotPage() {
     }
   };
 
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (!id) return <Navigate to="/websites" replace />;
+  // Don't hard-redirect to login — show inline message instead so user doesn't lose context
+  if (!isAuthenticated) {
+    return (
+      <div className="h-screen flex items-center justify-center" style={{ background: '#070d18' }}>
+        <div className="text-center">
+          <p className="text-sm mb-3" style={{ color: '#e2e8f0' }}>Your session has expired.</p>
+          <Link to="/login" className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg" style={{ background: '#22c55e', color: '#0b1220' }}>
+            Sign in again
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const token = getAccessToken();
   const previewUrl = token ? `${API_URL}/sdk/v1/preview/${id}?token=${encodeURIComponent(token)}` : null;
@@ -240,14 +260,16 @@ export function PagePilotPage() {
                 <span className="text-[10px]" style={{ color: '#334155' }}>This may take a moment on first load</span>
               </>
             )}
-            {loadStatus === 'timeout' && (
+            {(loadStatus === 'timeout' || loadStatus === 'error') && (
               <>
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: 'rgba(245,158,11,0.1)' }}>
-                  <RefreshCw size={20} style={{ color: '#f59e0b' }} />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: loadStatus === 'error' ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)' }}>
+                  <RefreshCw size={20} style={{ color: loadStatus === 'error' ? '#ef4444' : '#f59e0b' }} />
                 </div>
-                <span className="text-sm font-medium" style={{ color: '#e2e8f0' }}>Preview is taking longer than usual</span>
+                <span className="text-sm font-medium" style={{ color: '#e2e8f0' }}>
+                  {loadStatus === 'error' ? (loadError || 'Failed to load editing tools') : 'Preview is taking longer than usual'}
+                </span>
                 <span className="text-xs text-center max-w-xs" style={{ color: '#64748b' }}>
-                  The server may be waking up from a cold start. Click retry to try again.
+                  {loadStatus === 'error' ? 'The SDK could not be loaded. Check the website URL and try again.' : 'The server may be waking up from a cold start. Click retry to try again.'}
                 </span>
                 <button onClick={reloadPreview}
                   className="flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg transition-colors"

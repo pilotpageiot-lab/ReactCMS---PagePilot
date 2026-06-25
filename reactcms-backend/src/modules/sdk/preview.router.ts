@@ -118,8 +118,12 @@ async function buildMirrorHtml(siteUrl: string, apiUrl: string): Promise<string>
     (function(){
       var s=document.createElement('script');
       s.src="${escapeHtml(apiUrl)}/sdk/v1/sdk.js";
-      s.onload=s.onerror=function(){
+      s.onload=function(){
         if(window.parent!==window) window.parent.postMessage({type:'pagepilot:ready'},'*');
+      };
+      s.onerror=function(){
+        console.error('[PagePilot] SDK failed to load');
+        if(window.parent!==window) window.parent.postMessage({type:'pagepilot:error',message:'SDK failed to load'},'*');
       };
       document.head.appendChild(s);
     })();
@@ -181,8 +185,12 @@ function buildFallbackHtml(
     (function(){
       var s=document.createElement('script');
       s.src="${escapeHtml(apiUrl)}/sdk/v1/sdk.js";
-      s.onload=s.onerror=function(){
+      s.onload=function(){
         if(window.parent!==window) window.parent.postMessage({type:'pagepilot:ready'},'*');
+      };
+      s.onerror=function(){
+        console.error('[PagePilot] SDK failed to load');
+        if(window.parent!==window) window.parent.postMessage({type:'pagepilot:error',message:'SDK failed to load'},'*');
       };
       document.head.appendChild(s);
     })();
