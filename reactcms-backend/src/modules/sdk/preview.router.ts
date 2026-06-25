@@ -155,21 +155,69 @@ router.get('/:websiteId', async (req: Request, res: Response, next: NextFunction
 
 // ── Mirror mode with Redis cache ─────────────────────────────────────────────
 
+const TEXT_TAGS = 'h1,h2,h3,h4,h5,h6,p,span,a,button,label,li,td,th,blockquote,figcaption,small,strong,em,b,i,u,legend,dt,dd,summary,caption';
+const SKIP_ANCESTORS = new Set(['script', 'style', 'noscript', 'svg', 'head', 'template', 'nav']);
+
+function slugify(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 50);
+}
+
 function injectContentIntoHtml(html: string, content: ContentRow[]): string {
-  if (content.length === 0) return html;
   const $ = cheerio.load(html);
-  for (const row of content) {
-    if (!row.value) continue;
-    const el = $(`[data-cms="${row.cms_key}"]`);
-    if (el.length === 0) continue;
-    if (row.content_type === 'image') {
-      el.attr('src', row.value);
-    } else if (row.content_type === 'richtext') {
-      el.html(row.value);
-    } else {
-      el.text(row.value);
+  const contentMap = new Map(content.map((r) => [r.cms_key, r]));
+  const usedKeys = new Set<string>();
+
+  // Phase 1: inject values into existing [data-cms] elements
+  $('[data-cms]').each((_, el) => {
+    const key = $(el).attr('data-cms');
+    if (!key) return;
+    usedKeys.add(key);
+    const row = contentMap.get(key);
+    if (!row?.value) return;
+    if (row.content_type === 'image') $(el).attr('src', row.value);
+    else if (row.content_type === 'richtext') $(el).html(row.value);
+    else $(el).text(row.value);
+  });
+
+  // Phase 2: auto-tag all text elements (same logic as inline PagePilot)
+  // so they become editable AND show published CMS values
+  $(TEXT_TAGS).each((i, el) => {
+    if ($(el).attr('data-cms')) return;
+    const tag = (el as any).tagName?.toLowerCase();
+    if (!tag) return;
+
+    // Skip if inside a skipped ancestor
+    let skip = false;
+    $(el).parents().each((_, p) => {
+      if (SKIP_ANCESTORS.has((p as any).tagName?.toLowerCase())) { skip = true; return false; }
+    });
+    if (skip) return;
+
+    const text = $(el).text().trim();
+    if (text.length < 2) return;
+
+    // Skip parents that have child text tags (prefer leaf nodes)
+    const childTextEl = $(el).find(TEXT_TAGS).first();
+    if (childTextEl.length > 0 && childTextEl.text().trim().length >= 2) return;
+
+    // Generate key
+    const slug = slugify(text);
+    let key = slug.length >= 3 ? `${tag}-${slug}` : `${tag}-${i}`;
+    if (usedKeys.has(key)) { let s = 2; while (usedKeys.has(`${key}-${s}`)) s++; key = `${key}-${s}`; }
+    usedKeys.add(key);
+
+    // Add data-cms attribute
+    $(el).attr('data-cms', key);
+
+    // Inject published value if we have one
+    const row = contentMap.get(key);
+    if (row?.value) {
+      if (row.content_type === 'image') $(el).attr('src', row.value);
+      else if (row.content_type === 'richtext') $(el).html(row.value);
+      else $(el).text(row.value);
     }
-  }
+  });
+
   return $.html();
 }
 
