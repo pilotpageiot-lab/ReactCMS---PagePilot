@@ -280,20 +280,48 @@ function EditorPanel({
 
 // ── Footer stats with progress bar ───────────────────────────────────────────
 
-function FooterStats({ items, onDeleteAll }: { items: ContentItem[]; onDeleteAll: () => void }) {
+function FooterStats({ items, websiteId, onDeleteAll }: { items: ContentItem[]; websiteId: string; onDeleteAll: () => void }) {
+  const queryClient = useQueryClient();
   const published = items.filter((i) => i.is_published).length;
+  const unpublished = items.length - published;
   const pct = items.length > 0 ? Math.round((published / items.length) * 100) : 0;
+  const [publishing, setPublishing] = useState(false);
+
+  const publishAllDrafts = async () => {
+    setPublishing(true);
+    const drafts = items.filter((i) => !i.is_published);
+    let count = 0;
+    await Promise.allSettled(
+      drafts.map((item) =>
+        contentApi.publish(websiteId, item.cms_key).then(() => { count++; }).catch(() => {})
+      ),
+    );
+    queryClient.invalidateQueries({ queryKey: ['content', websiteId] });
+    setPublishing(false);
+    if (count > 0) toast.success(`Published ${count} key(s)`);
+  };
 
   return (
     <div className="px-3 sm:px-4 py-2 sm:py-2.5 border-t border-gray-100 space-y-1.5">
       <div className="flex items-center justify-between text-[10px] text-gray-400">
         <span className="font-medium">{published}/{items.length} published ({pct}%)</span>
-        <button
-          onClick={onDeleteAll}
-          className="text-[10px] text-red-400 hover:text-red-600 font-medium transition-colors"
-        >
-          Delete all
-        </button>
+        <div className="flex items-center gap-2">
+          {unpublished > 0 && (
+            <button
+              onClick={publishAllDrafts}
+              disabled={publishing}
+              className="text-[10px] text-emerald-500 hover:text-emerald-400 font-semibold transition-colors disabled:opacity-50"
+            >
+              {publishing ? 'Publishing…' : `Publish all (${unpublished})`}
+            </button>
+          )}
+          <button
+            onClick={onDeleteAll}
+            className="text-[10px] text-red-400 hover:text-red-600 font-medium transition-colors"
+          >
+            Delete all
+          </button>
+        </div>
       </div>
       <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
         <div
@@ -463,7 +491,7 @@ export function ContentTab({ websiteId, customDomain }: { websiteId: string; cus
 
         {/* Footer stats with progress */}
         {items.length > 0 && (
-          <FooterStats items={items} onDeleteAll={() => setDeleteAllOpen(true)} />
+          <FooterStats items={items} websiteId={websiteId} onDeleteAll={() => setDeleteAllOpen(true)} />
         )}
       </div>
 
